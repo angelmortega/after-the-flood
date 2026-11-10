@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import re
 import uuid
 from dataclasses import dataclass, field
@@ -415,5 +416,20 @@ async def run(question: str, clarification: str = ""):
     return StreamingResponse(events(), media_type="text/event-stream")
 
 
+def billed_project() -> str:
+    """The project Vertex AI bills, resolved the way LiteLLM does: VERTEXAI_PROJECT first, then
+    Google's default credentials (GOOGLE_CLOUD_PROJECT, then `gcloud config`)."""
+    if os.environ.get("VERTEXAI_PROJECT"):
+        return f"{os.environ['VERTEXAI_PROJECT']} (from VERTEXAI_PROJECT)"
+    try:
+        import google.auth
+
+        _, project = google.auth.default()
+        return f"{project} (from gcloud defaults: set VERTEXAI_PROJECT in .env to pin it)"
+    except Exception as e:
+        return f"unknown ({type(e).__name__}: run gcloud auth application-default login)"
+
+
 if __name__ == "__main__":
+    print(f"Vertex AI bills project: {billed_project()}")
     uvicorn.run(app, host="127.0.0.1", port=8000)
