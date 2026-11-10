@@ -1,5 +1,5 @@
 {
-  "built": "2026-11-10T03:41:12+00:00",
+  "built": "2026-11-10T19:45:27+00:00",
   "states": [
     "NY",
     "WA",
@@ -57,6 +57,12 @@
       "mb": 32.6,
       "source": "https://www.fema.gov/api/open/v3/NfipClaims (OpenFEMA NFIP Redacted Claims v3)",
       "note": "Anonymized: ZIP, county and census block group, no addresses. Only insured properties."
+    },
+    "zip_centroids": {
+      "file": "zip_centroids.parquet",
+      "rows": 8965,
+      "mb": 0.2,
+      "source": "https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2020_Gazetteer/2020_Gaz_zcta_national.zip"
     }
   }
 }

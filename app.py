@@ -40,6 +40,8 @@ class Research:
     researchers: int = 0  # how many researchers have started, to number them
     findings: list[str] = field(default_factory=list)  # what each researcher reported, for the Writer
     sources: dict[str, dict] = field(default_factory=dict)  # "S1" -> the tool call, tables and SQL behind it
+    charts: list[dict] = field(default_factory=list)  # recovery curves, for the page
+    map: dict | None = None  # ZIPs around the place with their claims, for the page
 
 
 def _answer(ctx: RunContextWrapper[Research], name: str, args: dict, fn, **kwargs) -> str:
@@ -54,7 +56,12 @@ def _answer(ctx: RunContextWrapper[Research], name: str, args: dict, fn, **kwarg
         return json.dumps(result, default=str)
     source_id = f"S{len(ctx.context.sources) + 1}"
     ctx.context.sources[source_id] = {"tool": name, "args": args, **result.get("source", {})}
-    body = {k: v for k, v in result.items() if k != "source"}
+    if "chart" in result:
+        # The recovery curve goes straight to the page; the model gets the yearly summary.
+        chart = {**result["chart"], "source_id": source_id}
+        ctx.context.charts.append(chart)
+        ctx.context.hooks.emit({"type": "chart", **chart})
+    body = {k: v for k, v in result.items() if k not in ("source", "chart")}
     return json.dumps({"source_id": source_id, **body}, default=str)
 
 
@@ -70,7 +77,23 @@ def resolve_place(ctx: RunContextWrapper[Research], place: str, state: str | Non
             Neighborhoods are not in the data: pass their ZIP codes instead.
         state: Two-letter state code, to tell apart places with the same name. Optional.
     """
-    return _answer(ctx, "resolve_place", {"place": place, "state": state}, tools.resolve_place, place=place, state=state)
+    answer = _answer(ctx, "resolve_place", {"place": place, "state": state}, tools.resolve_place, place=place, state=state)
+    _send_map(ctx.context, json.loads(answer))
+    return answer
+
+
+def _send_map(run: "Research", place: dict) -> None:
+    """Draw the place on the page's map as soon as it's resolved: every ZIP in its counties,
+    sized by NFIP claims, with the place's own ZIPs highlighted."""
+    if "error" in place or not place.get("counties"):
+        return
+    try:
+        counties = [c["county_fips"] for c in place["counties"]][:3]
+        data = tools.claims_map(counties, place["zips"])
+    except Exception:
+        return  # the map is a nicety: never fail the research over it
+    run.map = {"zips": data["zips"], "counties": place["counties"]}
+    run.hooks.emit({"type": "map", **run.map})
 
 
 @function_tool
@@ -296,7 +319,9 @@ Sections, in this order:
 
 Rules:
 - End every sentence that states a number with the source id(s) of its finding, e.g. [S4].
-- Use only numbers that appear in the findings. Never compute new totals or percentages.
+- Use only numbers that appear in the findings. Never compute new totals, counts or percentages,
+  e.g. don't turn "44.2% primary residences" and "2,611 claims" into a count of homes.
+- Write for a home buyer, not a programmer: never mention field names, "null", or tool names.
 - Never say the flood caused a price change: say how the ZIP's values moved compared with similar ZIPs.
 - Write plain, specific sentences. No "profoundly", "pivotal", "it is worth noting".""",
     model=MODEL,
@@ -338,7 +363,8 @@ async def deep_research(question: str, clarification: str, hooks: PanelHooks) ->
     asked = question + (f"\n(Clarified: {clarification})" if clarification else "")
     report = await Runner.run(writer, f"Question: {asked}\n\nFindings:\n\n{findings}", hooks=hooks)
     markdown = str(report.final_output)
-    return {"type": "done", "markdown": markdown + source_list(markdown, research_run.sources)}
+    return {"type": "done", "markdown": markdown + source_list(markdown, research_run.sources),
+            "charts": research_run.charts, "map": research_run.map}
 
 
 # --- FastAPI App ---

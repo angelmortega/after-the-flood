@@ -23,6 +23,7 @@ TABLES = {
     "zhvi": "Zillow Home Value Index (ZHVI), typical home value by ZIP and month",
     "zips": "ZIP metadata: city, metro, county (Zillow + Census)",
     "zip_county": "Census ZCTA -> county overlap",
+    "zip_centroids": "Census ZCTA internal points (Gazetteer)",
 }
 # NOAA event types that are floods, or storms that bring floods.
 FLOOD_EVENT_TYPES = [
@@ -378,7 +379,8 @@ def recovery_vs_controls(zip_code: str, event_date: str, event_name: str | None 
         return {"error": f"Only {len(controls)} control ZIPs found for {zip_code}: too few to compare.",
                 "controls": controls, "source": _source(["zips", "zhvi", "nfip_claims"], sql1)}
 
-    params2 = {"zips": [zip_code] + [c["zip"] for c in controls], "from": params["from"],
+    # From a year before the event, so the chart shows the trend going in.
+    params2 = {"zips": [zip_code] + [c["zip"] for c in controls], "from": (event - timedelta(days=366)).isoformat(),
                "to": (event + timedelta(days=31 * months_after)).isoformat()}
     series, sql2 = _query("""
         SELECT zip, month, value FROM zhvi
@@ -389,16 +391,15 @@ def recovery_vs_controls(zip_code: str, event_date: str, event_name: str | None 
     for r in series:
         by_month.setdefault(r["month"], {})[r["zip"]] = r["value"] / baselines[r["zip"]]
 
-    path = []
+    chart = []  # every month, before and after the event
     for month, idx in sorted(by_month.items()):
-        if month < event_date or zip_code not in idx:
-            continue
         ctrl = [v for z, v in idx.items() if z != zip_code]
-        if not ctrl:
+        if zip_code not in idx or not ctrl:
             continue
         ctrl_median = statistics.median(ctrl)
-        path.append({"month": month, "zip_index": round(idx[zip_code], 3),
-                     "controls_index": round(ctrl_median, 3), "relative": round(idx[zip_code] / ctrl_median, 3)})
+        chart.append({"month": month, "zip_index": round(idx[zip_code], 3),
+                      "controls_index": round(ctrl_median, 3), "relative": round(idx[zip_code] / ctrl_median, 3)})
+    path = [p for p in chart if p["month"] >= event_date]
     if not path:
         return {"error": "No home values after the event.", "source": _source(["zhvi"], sql1, sql2)}
 
@@ -422,11 +423,37 @@ def recovery_vs_controls(zip_code: str, event_date: str, event_name: str | None 
         "recovered": {**recovered, "months_after_event": months_to(recovered)} if recovered else None,
         "verdict": verdict,
         "path_yearly": [p for i, p in enumerate(path) if i % 12 == 0] + ([path[-1]] if (len(path) - 1) % 12 else []),
+        # For the page's chart, not the model: app.py takes it out of what the model sees.
+        "chart": {"zip": zip_code, "event_date": event_date, "event_name": event_name, "baseline_value": round(base),
+                  "control_scope": control_scope, "controls": [c["zip"] for c in controls], "months": chart},
         "method": recovery_vs_controls.__doc__.split("\n\n", 1)[1].strip(),
         "caveats": ["This shows correlation, not causation: the controls rule out market-wide moves, not everything.",
                     "ZHVI is smoothed: short dips are spread out and look smaller."],
         "source": _source(["zips", "zhvi", "nfip_claims"], sql1, sql2),
     }
+
+
+# --- For the page's map, not the model ---
+
+
+def claims_map(county_fips: list[str], highlight: list[str] | None = None) -> dict:
+    """Every ZIP in these counties with its location and NFIP claims since 1978, for the map."""
+    rows, sql_text = _query("""
+        WITH area AS (SELECT DISTINCT zip FROM zip_county WHERE county_fips IN (SELECT unnest($counties))),
+        claims AS (
+            SELECT zip, count(*) AS claims, sum(paid_total) AS paid_usd,
+                   count(*) FILTER (WHERE year_of_loss >= 2000) AS claims_since_2000
+            FROM nfip_claims WHERE zip IN (SELECT zip FROM area) GROUP BY zip
+        )
+        SELECT a.zip, z.city, g.lat, g.lon, coalesce(c.claims, 0) AS claims, coalesce(c.paid_usd, 0) AS paid_usd,
+               coalesce(c.claims_since_2000, 0) AS claims_since_2000
+        FROM area a JOIN zip_centroids g USING (zip) LEFT JOIN zips z USING (zip) LEFT JOIN claims c USING (zip)
+        ORDER BY claims DESC
+    """, {"counties": county_fips})
+    highlight = set(highlight or [])
+    for r in rows:
+        r["highlight"] = r["zip"] in highlight
+    return {"zips": rows, "source": _source(["zip_county", "zip_centroids", "nfip_claims", "zips"], sql_text)}
 
 
 # --- Escape hatch: read-only SQL ---

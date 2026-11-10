@@ -4,226 +4,697 @@
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>After the Flood</title>
+        <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M16 3C11 11 7 16 7 21a9 9 0 0 0 18 0c0-5-4-10-9-18z' fill='%231565c0'/></svg>" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
         <style>
+            :root {
+                --bg: #f6f7f9;
+                --card: #ffffff;
+                --ink: #14202b;
+                --muted: #5d6b78;
+                --line: #dfe4e9;
+                --accent: #1565c0;
+                --accent-soft: #e3effc;
+                --zip: #d84315;
+                --controls: #546e7a;
+                --hazard: #6a1b9a;
+                --insurance: #1565c0;
+                --market: #2e7d32;
+                --error: #c62828;
+            }
             * {
                 box-sizing: border-box;
-                margin: 0;
-                padding: 0;
             }
             body {
-                font-family: system-ui, sans-serif;
-                padding: 2rem;
-                color: #111;
+                margin: 0;
+                font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+                background: var(--bg);
+                color: var(--ink);
+                line-height: 1.5;
             }
             main {
-                max-width: 760px;
+                max-width: 1100px;
                 margin: 0 auto;
-                display: flex;
-                flex-direction: column;
-                gap: 1.5rem;
+                padding: 2rem 1rem 4rem;
+                display: grid;
+                gap: 1.25rem;
             }
-            section {
-                border: 1px solid #e0e0e0;
+            header h1 {
+                margin: 0;
+                font-size: 1.75rem;
+                letter-spacing: -0.01em;
+            }
+            header p {
+                margin: 0.35rem 0 0;
+                color: var(--muted);
+                max-width: 60rem;
+            }
+            .card {
+                background: var(--card);
+                border: 1px solid var(--line);
+                border-radius: 10px;
                 padding: 1.25rem 1.5rem;
+                min-width: 0;
             }
-            h1 {
-                font-size: 1rem;
-                font-weight: 600;
-            }
-            h2 {
+            .card > h2 {
+                margin: 0 0 0.75rem;
                 font-size: 0.75rem;
                 text-transform: uppercase;
-                letter-spacing: 0.05em;
-                color: #999;
-                font-weight: 400;
-                margin-bottom: 0.75rem;
+                letter-spacing: 0.06em;
+                color: var(--muted);
+                font-weight: 600;
                 display: flex;
                 justify-content: space-between;
                 align-items: baseline;
+                gap: 1rem;
             }
-            #question,
-            #answer {
-                width: 100%;
-                padding: 0.6rem 0;
-                border: none;
-                border-bottom: 1px solid #e0e0e0;
-                font-size: 1rem;
+            .row {
+                display: flex;
+                gap: 0.75rem;
+            }
+            input[type="text"] {
+                flex: 1;
+                min-width: 0;
+                padding: 0.7rem 0.9rem;
+                border: 1px solid var(--line);
+                border-radius: 8px;
+                font: inherit;
                 outline: none;
             }
-            #question:focus,
-            #answer:focus {
-                border-bottom-color: #000;
-            }
-            #task label {
-                display: block;
-                font-size: 0.75rem;
-                color: #999;
-            }
-            #task label + label {
-                margin-top: 1rem;
-            }
-            #run {
-                margin-top: 1rem;
+            input[type="text"]:focus {
+                border-color: var(--accent);
+                box-shadow: 0 0 0 3px var(--accent-soft);
             }
             button {
-                padding: 0.75rem 1.5rem;
-                background: #000;
-                color: #fff;
+                padding: 0.7rem 1.3rem;
                 border: none;
-                font-size: 0.75rem;
-                text-transform: uppercase;
-                letter-spacing: 0.05em;
+                border-radius: 8px;
+                background: var(--accent);
+                color: #fff;
+                font: inherit;
+                font-weight: 600;
                 cursor: pointer;
             }
             button:disabled {
-                opacity: 0.3;
+                opacity: 0.4;
+                cursor: default;
             }
-            #activity {
-                list-style: none;
-                font-size: 0.85rem;
-                line-height: 1.7;
-            }
-            #activity .agent {
-                font-weight: 600;
-            }
-            #activity .error {
-                color: #dc2626;
-            }
-            #status {
-                color: #999;
+            button.link {
+                background: none;
+                color: var(--accent);
+                padding: 0;
+                font-weight: 500;
+                font-size: 0.8rem;
                 text-transform: none;
                 letter-spacing: 0;
             }
-            #output {
-                font-family: ui-monospace, monospace;
-                font-size: 0.8rem;
-                white-space: pre-wrap;
-                word-break: break-word;
-                line-height: 1.5;
+            .examples {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.5rem;
+                margin-top: 0.75rem;
+            }
+            .examples button {
+                background: var(--accent-soft);
+                color: var(--accent);
+                font-weight: 500;
+                font-size: 0.85rem;
+                padding: 0.35rem 0.75rem;
+                border-radius: 999px;
+                text-align: left;
             }
             #clarify ul {
                 margin: 0 0 1rem 1.2rem;
-                line-height: 1.7;
+                padding: 0;
+            }
+            #status {
+                font-weight: 400;
+                text-transform: none;
+                letter-spacing: 0;
+            }
+            #status.error {
+                color: var(--error);
+            }
+            .stages {
+                display: flex;
+                gap: 0.5rem;
+                flex-wrap: wrap;
+                margin-bottom: 1rem;
+                font-size: 0.85rem;
+            }
+            .stage {
+                padding: 0.25rem 0.7rem;
+                border-radius: 999px;
+                background: var(--bg);
+                color: var(--muted);
+            }
+            .stage.active {
+                background: var(--accent-soft);
+                color: var(--accent);
+                font-weight: 600;
+            }
+            .stage.done {
+                color: var(--ink);
+            }
+            .stage.done::before {
+                content: "✓ ";
+            }
+            .researchers {
+                display: grid;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 0.75rem;
+            }
+            .researcher {
+                border: 1px solid var(--line);
+                border-top: 3px solid var(--c);
+                border-radius: 8px;
+                padding: 0.75rem;
+                font-size: 0.82rem;
+                min-height: 7rem;
+            }
+            .researcher h3 {
+                margin: 0 0 0.15rem;
+                font-size: 0.9rem;
+                color: var(--c);
+            }
+            .researcher .what {
+                color: var(--muted);
+                font-size: 0.75rem;
+                margin-bottom: 0.5rem;
+            }
+            .researcher ol {
+                margin: 0;
+                padding: 0;
+                list-style: none;
+            }
+            .researcher li {
+                padding: 0.15rem 0;
+                border-top: 1px dashed var(--line);
+                overflow-wrap: anywhere;
+            }
+            .researcher li.finished {
+                color: var(--muted);
+            }
+            #error {
+                color: var(--error);
+                margin-top: 0.75rem;
+                overflow-wrap: anywhere;
+            }
+            .visuals {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+                gap: 1.25rem;
+            }
+            #map {
+                height: 360px;
+                border-radius: 8px;
+            }
+            .chart-box {
+                position: relative;
+                height: 300px;
+            }
+            .note {
+                color: var(--muted);
+                font-size: 0.8rem;
+                margin: 0.5rem 0 0;
+            }
+            #chart-pick {
+                display: flex;
+                gap: 0.4rem;
+                flex-wrap: wrap;
+                margin-bottom: 0.5rem;
+            }
+            #chart-pick button {
+                background: var(--bg);
+                color: var(--ink);
+                font-weight: 500;
+                font-size: 0.8rem;
+                padding: 0.25rem 0.6rem;
+            }
+            #chart-pick button.on {
+                background: var(--zip);
+                color: #fff;
+            }
+            #report {
+                font-size: 0.97rem;
+                max-width: 52rem;
+            }
+            #report h1,
+            #report h2 {
+                font-size: 1.15rem;
+                margin: 1.5rem 0 0.5rem;
+            }
+            #report h1:first-child,
+            #report h2:first-child {
+                margin-top: 0;
+            }
+            #report a.cite {
+                font-size: 0.75em;
+                text-decoration: none;
+                background: var(--accent-soft);
+                padding: 0 0.3em;
+                border-radius: 4px;
+                white-space: nowrap;
+            }
+            #sources {
+                margin-top: 1.5rem;
+                font-size: 0.82rem;
+            }
+            #sources summary {
+                cursor: pointer;
+                font-weight: 600;
+            }
+            #sources li:target {
+                background: #fff8e1;
+            }
+            #sources pre {
+                background: var(--bg);
+                padding: 0.6rem;
+                border-radius: 6px;
+                overflow-x: auto;
+                font-size: 0.75rem;
             }
             .empty {
-                color: #999;
+                color: var(--muted);
+            }
+            #about h3 {
+                font-size: 0.95rem;
+                margin: 1rem 0 0.25rem;
+            }
+            #about p,
+            #about ul {
+                margin: 0.25rem 0;
+                color: var(--ink);
+            }
+            /* The context panel (context-panel.js) is for debugging: hidden until asked for. */
+            html:not(.show-context) #context-panel {
+                display: none;
+            }
+            html:not(.show-context) body {
+                margin-right: 0 !important;
+            }
+            @media (max-width: 800px) {
+                .researchers,
+                .visuals {
+                    grid-template-columns: minmax(0, 1fr);
+                }
+                .row {
+                    flex-direction: column;
+                }
             }
         </style>
     </head>
     <body>
         <main>
-            <h1>After the Flood: name a place in NY, WA, CA, TX, MA, IL or FL. Three researchers check its storms (NOAA, FEMA), flood insurance claims (NFIP) and home values (Zillow) in parallel, and a writer turns their findings into a cited report.</h1>
+            <header>
+                <h1>After the Flood</h1>
+                <p>
+                    Name a place in New York, Washington, California, Texas, Massachusetts, Illinois or Florida. Three researchers check its storms, its
+                    flood insurance claims and its home values in parallel, and a writer turns what they find into a cited report with a recovery verdict.
+                </p>
+            </header>
 
-            <section>
-                <h2>Task</h2>
-                <form id="task">
-                    <label>Question
-                        <input id="question" value="How did Hurricane Sandy affect home values in Rockaway, Queens (11691, 11692, 11694)?" placeholder="A place, and optionally an event: e.g. Is Fort Myers Beach safe to buy in?" autocomplete="off" />
-                    </label>
-                    <button id="run" type="submit">Run</button>
+            <section class="card">
+                <h2>Ask</h2>
+                <form id="task" class="row">
+                    <input id="question" type="text" placeholder="A place, and optionally an event: e.g. How did Hurricane Ian affect Fort Myers Beach?" autocomplete="off" />
+                    <button id="run" type="submit">Research</button>
                 </form>
+                <div class="examples" id="examples">
+                    <button type="button">How did Hurricane Sandy affect home values in Rockaway, Queens (11691, 11692, 11694)?</button>
+                    <button type="button">Which ZIP codes in Harris County, TX have flooded the most since 2000?</button>
+                    <button type="button">Is Fort Myers Beach safe to buy in?</button>
+                </div>
             </section>
 
-            <section id="clarify" hidden>
+            <section class="card" id="clarify" hidden>
                 <h2>A few questions first</h2>
                 <form id="clarify-form">
                     <ul id="clarify-questions"></ul>
-                    <input id="answer" placeholder="Your answers" autocomplete="off" />
-                    <button type="submit">Continue</button>
+                    <div class="row">
+                        <input id="answer" type="text" placeholder="Your answers, in one line" autocomplete="off" />
+                        <button type="submit">Continue</button>
+                    </div>
                 </form>
             </section>
 
-            <section>
-                <h2>Activity <span id="status"></span></h2>
-                <ol id="activity"><li class="empty">Each agent's steps appear here.</li></ol>
+            <section class="card" id="progress" hidden>
+                <h2>Research <span id="status"></span></h2>
+                <div class="stages">
+                    <span class="stage" data-stage="lead">Lead plans</span>
+                    <span class="stage" data-stage="research">Researchers work</span>
+                    <span class="stage" data-stage="writer">Writer drafts</span>
+                </div>
+                <div class="researchers">
+                    <div class="researcher" style="--c: var(--hazard)" data-kind="Hazard">
+                        <h3>Hazard</h3>
+                        <div class="what">NOAA storm events, FEMA declarations</div>
+                        <ol><li class="empty">Waiting for the lead</li></ol>
+                    </div>
+                    <div class="researcher" style="--c: var(--insurance)" data-kind="Insurance">
+                        <h3>Insurance</h3>
+                        <div class="what">NFIP flood insurance claims</div>
+                        <ol><li class="empty">Waiting for the lead</li></ol>
+                    </div>
+                    <div class="researcher" style="--c: var(--market)" data-kind="Market">
+                        <h3>Market</h3>
+                        <div class="what">Zillow home values vs. control ZIPs</div>
+                        <ol><li class="empty">Waiting for the lead</li></ol>
+                    </div>
+                </div>
+                <div id="error" hidden></div>
+                <p class="note"><button class="link" id="toggle-context" type="button">Show what each agent sees</button></p>
             </section>
 
-            <section>
-                <h2>Output</h2>
-                <div id="output" class="empty">The report's markdown appears here.</div>
+            <div class="visuals" id="visuals" hidden>
+                <section class="card">
+                    <h2>Flood insurance claims by ZIP</h2>
+                    <div id="map"></div>
+                    <p class="note">Circle size: NFIP claims since 1978. Orange: the ZIPs you asked about. Locations are ZIP centers.</p>
+                </section>
+                <section class="card">
+                    <h2>Home values vs. similar ZIPs</h2>
+                    <div id="chart-pick"></div>
+                    <div class="chart-box"><canvas id="chart"></canvas></div>
+                    <p class="note" id="chart-note">The recovery curve appears when the market researcher finishes.</p>
+                </section>
+            </div>
+
+            <section class="card" id="report-card" hidden>
+                <h2>Report</h2>
+                <div id="report"></div>
+                <details id="sources" hidden>
+                    <summary>Sources: the tool call, tables and SQL behind every [S] citation</summary>
+                    <div id="sources-body"></div>
+                </details>
+            </section>
+
+            <section class="card" id="about">
+                <h2>About</h2>
+                <h3>What it explores</h3>
+                <p>
+                    For a place (a ZIP code, city or county) and optionally a storm, it finds out what happened (NOAA storm events and FEMA disaster
+                    declarations), what it cost (National Flood Insurance Program claims and payouts, and how often the place floods again), and what came
+                    after: did typical home values fall behind similar ZIP codes that the storm barely hit, and did they catch up?
+                </p>
+                <h3>Who it's for</h3>
+                <p>People buying or renting a home in a flood-prone area, local journalists, and city-planning students.</p>
+                <h3>How to use it</h3>
+                <p>
+                    Type a question with a place, or pick an example. If the place is vague, the lead asks you a few questions first. A run takes about a
+                    minute. Every number in the report links to the query behind it.
+                </p>
+                <h3>Data</h3>
+                <ul>
+                    <li>OpenFEMA NFIP Redacted Claims v3 and Disaster Declarations Summaries</li>
+                    <li>NOAA NCEI Storm Events Database, from 1996</li>
+                    <li>Zillow Home Value Index (ZHVI) by ZIP, from 2000</li>
+                    <li>Census ZIP (ZCTA) to county relationships and ZIP locations</li>
+                </ul>
+                <h3>What the data can't tell you</h3>
+                <p>
+                    Whether a specific house flooded (claims are anonymized to ZIP), damage to uninsured homes (few claims can mean few policies), what
+                    will happen next (these are records, not forecasts), or why prices moved: the comparison with similar ZIPs is correlation, not
+                    causation.
+                </p>
             </section>
         </main>
 
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
         <script src="/context-panel.js"></script>
         <script>
             const $ = (id) => document.getElementById(id);
+            const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
             let source = null;
             let runId = null;
+            let map = null;
+            let mapLayer = null;
+            let chart = null;
+            let charts = [];
 
-            function addActivity(agent, text, cls = "") {
-                const li = document.createElement("li");
-                li.className = cls;
-                if (agent) {
-                    const name = document.createElement("span");
-                    name.className = "agent";
-                    name.textContent = agent + " ";
-                    li.appendChild(name);
-                }
-                li.append(text);
-                $("activity").appendChild(li);
-            }
+            // --- Asking ---
 
-            function showOutput(markdown) {
-                $("output").className = "";
-                $("output").textContent = markdown;
-            }
-
-            function finish(message) {
-                $("status").textContent = message;
-                $("run").disabled = false;
-                source.close();
-            }
-
+            $("examples").addEventListener("click", (e) => {
+                if (e.target.tagName !== "BUTTON") return;
+                $("question").value = e.target.textContent;
+                start("");
+            });
             $("task").addEventListener("submit", (e) => {
                 e.preventDefault();
                 start("");
             });
-
             $("clarify-form").addEventListener("submit", (e) => {
                 e.preventDefault();
                 start($("answer").value.trim());
             });
-
-            function showClarify(questions) {
-                $("clarify-questions").replaceChildren(...questions.map((q) => Object.assign(document.createElement("li"), { textContent: q })));
-                $("answer").value = "";
-                $("clarify").hidden = false;
-                $("answer").focus();
-            }
+            $("toggle-context").addEventListener("click", () => {
+                const on = document.documentElement.classList.toggle("show-context");
+                $("toggle-context").textContent = on ? "Hide what each agent sees" : "Show what each agent sees";
+            });
 
             function start(clarification) {
+                const question = $("question").value.trim();
+                if (!question) return;
                 if (source) source.close();
-                $("clarify").hidden = true;
-                const params = new URLSearchParams({ question: $("question").value.trim(), clarification });
-
-                $("activity").replaceChildren();
-                $("output").className = "empty";
-                $("output").textContent = "The report's markdown appears here.";
+                reset();
+                $("progress").hidden = false;
+                setStage("lead");
                 $("status").textContent = "running";
                 $("run").disabled = true;
-                resetContext();
 
-                source = new EventSource("/run?" + params);
-                source.onmessage = (msg) => {
-                    const event = JSON.parse(msg.data);
-                    if (event.type === "start") runId = event.run_id;
-                    else if (event.type === "context") showContext(runId);
-                    else if (event.type === "activity") addActivity(event.agent, event.text);
-                    else if (event.type === "done") {
-                        showOutput(event.markdown);
-                        finish("done");
-                    } else if (event.type === "clarify") {
-                        showClarify(event.questions);
-                        finish("waiting for your answers");
-                    } else if (event.type === "error") {
-                        addActivity("", event.message, "error");
-                        finish("failed");
-                    }
-                };
-                source.onerror = () => {
-                    addActivity("", "Lost the connection to the server.", "error");
-                    finish("failed");
-                };
+                source = new EventSource("/run?" + new URLSearchParams({ question, clarification }));
+                source.onmessage = (msg) => handle(JSON.parse(msg.data));
+                source.onerror = () => fail("Lost the connection to the server.");
+            }
+
+            function handle(event) {
+                if (event.type === "start") runId = event.run_id;
+                else if (event.type === "context") showContext(runId);
+                else if (event.type === "activity") activity(event.agent, event.text);
+                else if (event.type === "map") showMap(event);
+                else if (event.type === "chart") addChart(event);
+                else if (event.type === "clarify") {
+                    $("progress").hidden = true;
+                    $("clarify-questions").replaceChildren(...event.questions.map((q) => Object.assign(document.createElement("li"), { textContent: q })));
+                    $("answer").value = "";
+                    $("clarify").hidden = false;
+                    $("answer").focus();
+                    finish("");
+                } else if (event.type === "done") {
+                    setStage(null);
+                    showReport(event.markdown);
+                    finish("done");
+                } else if (event.type === "error") fail(event.message);
+            }
+
+            function reset() {
+                $("clarify").hidden = true;
+                $("error").hidden = true;
+                $("status").className = "";
+                $("visuals").hidden = true;
+                $("report-card").hidden = true;
+                $("sources").hidden = true;
+                document.querySelectorAll(".researcher ol").forEach((ol) => (ol.innerHTML = '<li class="empty">Waiting for the lead</li>'));
+                document.querySelectorAll(".stage").forEach((s) => s.classList.remove("active", "done"));
+                charts = [];
+                $("chart-pick").replaceChildren();
+                $("chart-note").textContent = "The recovery curve appears when the market researcher finishes.";
+                if (chart) chart.destroy();
+                chart = null;
+                if (mapLayer) mapLayer.clearLayers();
+                resetContext();
+            }
+
+            function finish(status) {
+                $("status").textContent = status;
+                $("run").disabled = false;
+                if (source) source.close();
+            }
+
+            function fail(message) {
+                $("error").textContent = message;
+                $("error").hidden = false;
+                $("status").textContent = "failed";
+                $("status").className = "error";
+                finish("failed");
+            }
+
+            // --- Progress ---
+
+            const STAGES = ["lead", "research", "writer"];
+            function setStage(stage) {
+                const at = stage ? STAGES.indexOf(stage) : STAGES.length;
+                document.querySelectorAll(".stage").forEach((s) => {
+                    const i = STAGES.indexOf(s.dataset.stage);
+                    s.classList.toggle("active", i === at);
+                    s.classList.toggle("done", i < at);
+                });
+            }
+
+            const PLAIN = {
+                started: "Started",
+                "called storm_events": "Reading NOAA storm events",
+                "called declarations": "Reading FEMA declarations",
+                "called claims_summary": "Counting NFIP claims",
+                "called repeat_flooding": "Checking repeat flooding",
+                "called price_path": "Reading home values",
+                "called recovery_vs_controls": "Comparing with control ZIPs",
+                "called sql": "Running a custom query",
+                "called describe_tables": "Reading table columns",
+            };
+
+            function activity(agent, text) {
+                if (agent === "Writer") return setStage("writer");
+                const kind = ["Hazard", "Insurance", "Market"].find((k) => agent.startsWith(k));
+                if (!kind) return; // the lead: shown by the stage bar
+                setStage("research");
+                const ol = document.querySelector(`.researcher[data-kind="${kind}"] ol`);
+                ol.querySelector(".empty")?.remove();
+                const li = document.createElement("li");
+                const round = agent.match(/(\d+)$/)?.[1];
+                if (text.startsWith("finished")) {
+                    li.className = "finished";
+                    li.textContent = "Done: " + text.replace(/^finished:\s*[-•]?\s*/, "").slice(0, 140);
+                } else {
+                    li.textContent = (PLAIN[text] || text) + (text === "started" && round ? ` (researcher ${round})` : "");
+                }
+                ol.appendChild(li);
+            }
+
+            // --- Map ---
+
+            const usd = (n) => "$" + (n >= 1e9 ? (n / 1e9).toFixed(1) + "B" : n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : Math.round(n / 1e3) + "K");
+
+            function showMap(event) {
+                $("visuals").hidden = false;
+                if (!map) {
+                    map = L.map("map", { scrollWheelZoom: false });
+                    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                        maxZoom: 18,
+                        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                    }).addTo(map);
+                    mapLayer = L.featureGroup().addTo(map);
+                }
+                mapLayer.clearLayers();
+                const max = Math.max(1, ...event.zips.map((z) => z.claims));
+                // Draw the highlighted ZIPs last, so they sit on top.
+                const zips = [...event.zips].sort((a, b) => a.highlight - b.highlight);
+                for (const z of zips) {
+                    if (z.lat == null) continue;
+                    const color = z.highlight ? css("--zip") : css("--accent");
+                    L.circleMarker([z.lat, z.lon], {
+                        radius: 3 + 22 * Math.sqrt(z.claims / max),
+                        color,
+                        weight: z.highlight ? 2 : 1,
+                        fillColor: color,
+                        fillOpacity: z.highlight ? 0.55 : 0.3,
+                    })
+                        .bindPopup(`<b>${z.zip}</b> ${z.city || ""}<br>${z.claims.toLocaleString()} claims (${z.claims_since_2000.toLocaleString()} since 2000)<br>${usd(z.paid_usd)} paid`)
+                        .addTo(mapLayer);
+                }
+                // Invalidate first: the map was created while its card was hidden.
+                setTimeout(() => {
+                    map.invalidateSize();
+                    // Fit the whole county, so the asked-about ZIPs show in context.
+                    const bounds = L.latLngBounds(event.zips.filter((z) => z.lat != null).map((z) => [z.lat, z.lon]));
+                    if (bounds.isValid()) map.fitBounds(bounds, { padding: [20, 20] });
+                }, 0);
+            }
+
+            // --- Recovery chart ---
+
+            function addChart(event) {
+                $("visuals").hidden = false;
+                charts.push(event);
+                const b = document.createElement("button");
+                b.type = "button";
+                b.textContent = event.zip;
+                b.onclick = () => drawChart(charts.indexOf(event));
+                $("chart-pick").appendChild(b);
+                if (charts.length === 1) drawChart(0);
+            }
+
+            // A vertical line at the event's month.
+            const eventLine = {
+                id: "eventLine",
+                afterDatasetsDraw(c, _args, opts) {
+                    const i = c.data.labels.findIndex((m) => m >= opts.date);
+                    if (i < 0) return;
+                    const x = c.scales.x.getPixelForValue(i);
+                    const { top, bottom } = c.chartArea;
+                    const ctx = c.ctx;
+                    ctx.save();
+                    ctx.strokeStyle = "#888";
+                    ctx.setLineDash([4, 4]);
+                    ctx.beginPath();
+                    ctx.moveTo(x, top);
+                    ctx.lineTo(x, bottom);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.fillStyle = "#555";
+                    ctx.font = "12px system-ui";
+                    ctx.fillText(opts.label, x + 4, top + 12);
+                    ctx.restore();
+                },
+            };
+
+            function drawChart(i) {
+                const c = charts[i];
+                [...$("chart-pick").children].forEach((b, j) => b.classList.toggle("on", i === j));
+                const months = c.months.map((m) => m.month.slice(0, 7));
+                if (chart) chart.destroy();
+                chart = new Chart($("chart"), {
+                    type: "line",
+                    data: {
+                        labels: months,
+                        datasets: [
+                            { label: `ZIP ${c.zip}`, data: c.months.map((m) => +(100 * m.zip_index).toFixed(1)), borderColor: css("--zip"), backgroundColor: css("--zip"), borderWidth: 2.5, pointRadius: 0, tension: 0.2 },
+                            { label: `Control ZIPs (median of ${c.controls.length})`, data: c.months.map((m) => +(100 * m.controls_index).toFixed(1)), borderColor: css("--controls"), backgroundColor: css("--controls"), borderWidth: 2, borderDash: [6, 4], pointRadius: 0, tension: 0.2 },
+                        ],
+                    },
+                    options: {
+                        maintainAspectRatio: false,
+                        interaction: { mode: "index", intersect: false },
+                        scales: {
+                            x: { ticks: { maxTicksLimit: 8 }, grid: { display: false } },
+                            y: { title: { display: true, text: "Home value (pre-event = 100)" } },
+                        },
+                        plugins: {
+                            legend: { position: "bottom", labels: { boxWidth: 14 } },
+                            eventLine: { date: c.event_date.slice(0, 7), label: c.event_name ? `${c.event_name}` : "Event" },
+                        },
+                    },
+                    plugins: [eventLine],
+                });
+                $("chart-note").textContent =
+                    `Typical home value (Zillow ZHVI), 100 = the 3 months before the event. Controls: ${c.control_scope}, similar starting value, fewer than 10 claims in the event. [${c.source_id}]`;
+            }
+
+            // --- Report ---
+
+            function showReport(markdown) {
+                const [body, sources] = markdown.split(/\n## Sources\n/);
+                // Citations like [S3] or [S3, S7] link to their entry in the source list.
+                const linked = body.replace(/\[(S\d+(?:\s*,\s*S\d+)*)\]/g, (_, ids) =>
+                    ids.split(/\s*,\s*/).map((id) => `<a class="cite" href="#src-${id}">${id}</a>`).join(" "),
+                );
+                $("report").innerHTML = DOMPurify.sanitize(marked.parse(linked));
+                if (sources) {
+                    const html = DOMPurify.sanitize(marked.parse(sources));
+                    $("sources-body").innerHTML = html;
+                    $("sources-body").querySelectorAll("li").forEach((li) => {
+                        const id = li.textContent.match(/\[(S\d+)\]/)?.[1];
+                        if (id) li.id = "src-" + id;
+                    });
+                    $("sources").hidden = false;
+                }
+                // Opening the list when a citation is clicked, so the jump lands.
+                $("report").querySelectorAll("a.cite").forEach((a) => a.addEventListener("click", () => ($("sources").open = true)));
+                $("report-card").hidden = false;
+                $("report-card").scrollIntoView({ behavior: "smooth", block: "start" });
             }
         </script>
     </body>
