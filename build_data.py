@@ -28,8 +28,8 @@ from pathlib import Path
 import duckdb
 import httpx
 
-STATES = {"NY": "36", "WA": "53", "CA": "06", "TX": "48", "MA": "25", "IL": "17"}
-STATE_NAMES = {"NY": "NEW YORK", "WA": "WASHINGTON", "CA": "CALIFORNIA", "TX": "TEXAS", "MA": "MASSACHUSETTS", "IL": "ILLINOIS"}
+STATES = {"NY": "36", "WA": "53", "CA": "06", "TX": "48", "MA": "25", "IL": "17", "FL": "12"}
+STATE_NAMES = {"NY": "NEW YORK", "WA": "WASHINGTON", "CA": "CALIFORNIA", "TX": "TEXAS", "MA": "MASSACHUSETTS", "IL": "ILLINOIS", "FL": "FLORIDA"}
 # NOAA recorded only tornado, wind and hail before 1996: earlier years would skew every trend.
 NOAA_FIRST_YEAR = 1996
 
