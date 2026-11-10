@@ -10,3 +10,6 @@ __pycache__/
 
 # macOS
 .DS_Store
+
+# Downloads cached by build_data.py (several GB). The built Parquet files in data/ are small.
+data/raw/

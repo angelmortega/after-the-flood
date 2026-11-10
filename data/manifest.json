@@ -1,0 +1,62 @@
+{
+  "built": "2026-11-10T03:41:12+00:00",
+  "states": [
+    "NY",
+    "WA",
+    "CA",
+    "TX",
+    "MA",
+    "IL",
+    "FL"
+  ],
+  "tables": {
+    "declarations": {
+      "file": "declarations.parquet",
+      "rows": 14352,
+      "mb": 0.1,
+      "source": "https://www.fema.gov/api/open/v2/DisasterDeclarationsSummaries.parquet"
+    },
+    "zhvi": {
+      "file": "zhvi.parquet",
+      "rows": 2097480,
+      "mb": 16.0,
+      "source": "https://files.zillowstatic.com/research/public_csvs/zhvi/Zip_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv",
+      "note": "ZHVI all homes (SFR + condo), middle tier, smoothed, seasonally adjusted. Month = last day of month."
+    },
+    "zip_county": {
+      "file": "zip_county.parquet",
+      "rows": 11532,
+      "mb": 0.1,
+      "source": "https://www2.census.gov/geo/docs/maps-data/data/rel2020/zcta520/tab20_zcta520_county20_natl.txt",
+      "note": "2020 ZCTAs approximate USPS ZIPs."
+    },
+    "zips": {
+      "file": "zips.parquet",
+      "rows": 7593,
+      "mb": 0.1,
+      "source": "https://files.zillowstatic.com/research/public_csvs/zhvi/Zip_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv + https://www2.census.gov/geo/docs/maps-data/data/rel2020/zcta520/tab20_zcta520_county20_natl.txt"
+    },
+    "storm_events": {
+      "file": "storm_events.parquet",
+      "rows": 349052,
+      "mb": 17.2,
+      "source": "https://www.ncei.noaa.gov/pub/data/swdi/stormevents/csvfiles/",
+      "note": "From 1996. Damage is the NWS estimate at the time, not adjusted for inflation; blank means not estimated, not zero."
+    },
+    "storm_event_counties": {
+      "file": "storm_event_counties.parquet",
+      "rows": 345194,
+      "mb": 0.8,
+      "source": "https://www.weather.gov/gis/ZoneCounty",
+      "note": "Zone events are counted in every county the zone overlaps.",
+      "unmapped_events": 20486
+    },
+    "nfip_claims": {
+      "file": "nfip_claims.parquet",
+      "rows": 1176154,
+      "mb": 32.6,
+      "source": "https://www.fema.gov/api/open/v3/NfipClaims (OpenFEMA NFIP Redacted Claims v3)",
+      "note": "Anonymized: ZIP, county and census block group, no addresses. Only insured properties."
+    }
+  }
+}
