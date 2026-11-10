@@ -149,8 +149,7 @@ def storm_events(county_fips: str, start: str | None = None, end: str | None = N
     base = """
         SELECT e.* FROM storm_events e JOIN storm_event_counties c USING (event_id)
         WHERE c.county_fips = $county AND e.begin_date BETWEEN $start AND $end
-          AND ($types IS NULL OR e.event_type IN (SELECT unnest($types)))
-    """
+    """ + ("AND e.event_type IN (SELECT unnest($types))" if flood_only else "")
     by_type, sql1 = _query(f"""
         SELECT event_type, count(*) AS events, count(DISTINCT year(begin_date)) AS years_with_events,
                sum(deaths) AS deaths, sum(injuries) AS injuries, sum(damage_property) AS property_damage_usd,
@@ -222,11 +221,12 @@ def claims_summary(zips: list[str] | str | None = None, county_fips: str | None 
         return {"error": f"group_by must be one of {', '.join(groups)}"}
     params = {"zips": _zips(zips) if zips else None, "county": county_fips,
               "start": _date(start, "1970-01-01"), "end": _date(end, "2100-01-01")}
-    where = """
-        ($zips IS NULL OR zip IN (SELECT unnest($zips)))
-        AND ($county IS NULL OR county_fips = $county)
-        AND date_of_loss BETWEEN $start AND $end
-    """
+    # Only the filters that apply, so the cited SQL reads cleanly.
+    where = " AND ".join(
+        (["zip IN (SELECT unnest($zips))"] if params["zips"] else [])
+        + (["county_fips = $county"] if county_fips else [])
+        + ["date_of_loss BETWEEN $start AND $end"]
+    )
     total, sql1 = _query(f"""
         SELECT count(*) AS claims, sum(paid_total) AS paid_usd, median(paid_total) AS median_paid_usd,
                count(*) FILTER (WHERE paid_total > 0) AS claims_paid,
@@ -239,7 +239,8 @@ def claims_summary(zips: list[str] | str | None = None, county_fips: str | None 
     """, params)
     rows, sql2 = _query(f"""
         SELECT {groups[group_by]} AS {group_by}, count(*) AS claims, sum(paid_total) AS paid_usd,
-               median(paid_total) AS median_paid_usd, min(date_of_loss) AS first_loss, max(date_of_loss) AS last_loss
+               median(paid_total) AS median_paid_usd, mode(date_of_loss) AS peak_loss_date,
+               min(date_of_loss) AS first_loss, max(date_of_loss) AS last_loss
         FROM nfip_claims WHERE {where}
         GROUP BY 1 ORDER BY {"1" if group_by == "year" else "claims DESC"}
         LIMIT {MAX_ROWS}

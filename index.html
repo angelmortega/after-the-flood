@@ -3,7 +3,7 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Wikipedia Deep Research</title>
+        <title>After the Flood</title>
         <style>
             * {
                 box-sizing: border-box;
@@ -42,7 +42,7 @@
                 align-items: baseline;
             }
             #question,
-            #url {
+            #answer {
                 width: 100%;
                 padding: 0.6rem 0;
                 border: none;
@@ -51,7 +51,7 @@
                 outline: none;
             }
             #question:focus,
-            #url:focus {
+            #answer:focus {
                 border-bottom-color: #000;
             }
             #task label {
@@ -101,6 +101,10 @@
                 word-break: break-word;
                 line-height: 1.5;
             }
+            #clarify ul {
+                margin: 0 0 1rem 1.2rem;
+                line-height: 1.7;
+            }
             .empty {
                 color: #999;
             }
@@ -108,18 +112,24 @@
     </head>
     <body>
         <main>
-            <h1>Deep research: a lead splits your question, researchers walk Wikipedia in parallel, and a writer turns their findings into a cited report</h1>
+            <h1>After the Flood: name a place in NY, WA, CA, TX, MA, IL or FL. Three researchers check its storms (NOAA, FEMA), flood insurance claims (NFIP) and home values (Zillow) in parallel, and a writer turns their findings into a cited report.</h1>
 
             <section>
                 <h2>Task</h2>
                 <form id="task">
                     <label>Question
-                        <input id="question" value="How did the Apollo program's computers influence later computing?" placeholder="What do you want to know?" autocomplete="off" />
-                    </label>
-                    <label>Starting article
-                        <input id="url" value="https://en.wikipedia.org/wiki/Apollo_program" placeholder="A Wikipedia URL, e.g. https://en.wikipedia.org/wiki/Apollo_program" autocomplete="off" />
+                        <input id="question" value="How did Hurricane Sandy affect home values in Rockaway, Queens (11691, 11692, 11694)?" placeholder="A place, and optionally an event: e.g. Is Fort Myers Beach safe to buy in?" autocomplete="off" />
                     </label>
                     <button id="run" type="submit">Run</button>
+                </form>
+            </section>
+
+            <section id="clarify" hidden>
+                <h2>A few questions first</h2>
+                <form id="clarify-form">
+                    <ul id="clarify-questions"></ul>
+                    <input id="answer" placeholder="Your answers" autocomplete="off" />
+                    <button type="submit">Continue</button>
                 </form>
             </section>
 
@@ -166,8 +176,25 @@
 
             $("task").addEventListener("submit", (e) => {
                 e.preventDefault();
+                start("");
+            });
+
+            $("clarify-form").addEventListener("submit", (e) => {
+                e.preventDefault();
+                start($("answer").value.trim());
+            });
+
+            function showClarify(questions) {
+                $("clarify-questions").replaceChildren(...questions.map((q) => Object.assign(document.createElement("li"), { textContent: q })));
+                $("answer").value = "";
+                $("clarify").hidden = false;
+                $("answer").focus();
+            }
+
+            function start(clarification) {
                 if (source) source.close();
-                const params = new URLSearchParams({ question: $("question").value.trim(), url: $("url").value.trim() });
+                $("clarify").hidden = true;
+                const params = new URLSearchParams({ question: $("question").value.trim(), clarification });
 
                 $("activity").replaceChildren();
                 $("output").className = "empty";
@@ -185,6 +212,9 @@
                     else if (event.type === "done") {
                         showOutput(event.markdown);
                         finish("done");
+                    } else if (event.type === "clarify") {
+                        showClarify(event.questions);
+                        finish("waiting for your answers");
                     } else if (event.type === "error") {
                         addActivity("", event.message, "error");
                         finish("failed");
@@ -194,7 +224,7 @@
                     addActivity("", "Lost the connection to the server.", "error");
                     finish("failed");
                 };
-            });
+            }
         </script>
     </body>
 </html>
