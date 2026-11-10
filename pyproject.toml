@@ -1,7 +1,7 @@
 [project]
-name = "wikipedia-deep-research"
+name = "after-the-flood"
 version = "0.1.0"
-description = "Deep research over Wikipedia: a lead fans out researchers that walk Wikipedia's links, then a writer turns their findings into a cited report"
+description = "Deep research on floods and recovery: a lead fans out hazard, insurance and market researchers over NOAA, FEMA, NFIP and Zillow data, then a writer turns their findings into a cited report"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.109.0",
