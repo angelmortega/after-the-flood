@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Wikipedia Deep Research</title>
+        <style>
+            * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+            body {
+                font-family: system-ui, sans-serif;
+                padding: 2rem;
+                color: #111;
+            }
+            main {
+                max-width: 760px;
+                margin: 0 auto;
+                display: flex;
+                flex-direction: column;
+                gap: 1.5rem;
+            }
+            section {
+                border: 1px solid #e0e0e0;
+                padding: 1.25rem 1.5rem;
+            }
+            h1 {
+                font-size: 1rem;
+                font-weight: 600;
+            }
+            h2 {
+                font-size: 0.75rem;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                color: #999;
+                font-weight: 400;
+                margin-bottom: 0.75rem;
+                display: flex;
+                justify-content: space-between;
+                align-items: baseline;
+            }
+            #question,
+            #url {
+                width: 100%;
+                padding: 0.6rem 0;
+                border: none;
+                border-bottom: 1px solid #e0e0e0;
+                font-size: 1rem;
+                outline: none;
+            }
+            #question:focus,
+            #url:focus {
+                border-bottom-color: #000;
+            }
+            #task label {
+                display: block;
+                font-size: 0.75rem;
+                color: #999;
+            }
+            #task label + label {
+                margin-top: 1rem;
+            }
+            #run {
+                margin-top: 1rem;
+            }
+            button {
+                padding: 0.75rem 1.5rem;
+                background: #000;
+                color: #fff;
+                border: none;
+                font-size: 0.75rem;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                cursor: pointer;
+            }
+            button:disabled {
+                opacity: 0.3;
+            }
+            #activity {
+                list-style: none;
+                font-size: 0.85rem;
+                line-height: 1.7;
+            }
+            #activity .agent {
+                font-weight: 600;
+            }
+            #activity .error {
+                color: #dc2626;
+            }
+            #status {
+                color: #999;
+                text-transform: none;
+                letter-spacing: 0;
+            }
+            #output {
+                font-family: ui-monospace, monospace;
+                font-size: 0.8rem;
+                white-space: pre-wrap;
+                word-break: break-word;
+                line-height: 1.5;
+            }
+            .empty {
+                color: #999;
+            }
+        </style>
+    </head>
+    <body>
+        <main>
+            <h1>Deep research: a lead splits your question, researchers walk Wikipedia in parallel, and a writer turns their findings into a cited report</h1>
+
+            <section>
+                <h2>Task</h2>
+                <form id="task">
+                    <label>Question
+                        <input id="question" value="How did the Apollo program's computers influence later computing?" placeholder="What do you want to know?" autocomplete="off" />
+                    </label>
+                    <label>Starting article
+                        <input id="url" value="https://en.wikipedia.org/wiki/Apollo_program" placeholder="A Wikipedia URL, e.g. https://en.wikipedia.org/wiki/Apollo_program" autocomplete="off" />
+                    </label>
+                    <button id="run" type="submit">Run</button>
+                </form>
+            </section>
+
+            <section>
+                <h2>Activity <span id="status"></span></h2>
+                <ol id="activity"><li class="empty">Each agent's steps appear here.</li></ol>
+            </section>
+
+            <section>
+                <h2>Output</h2>
+                <div id="output" class="empty">The report's markdown appears here.</div>
+            </section>
+        </main>
+
+        <script src="/context-panel.js"></script>
+        <script>
+            const $ = (id) => document.getElementById(id);
+            let source = null;
+            let runId = null;
+
+            function addActivity(agent, text, cls = "") {
+                const li = document.createElement("li");
+                li.className = cls;
+                if (agent) {
+                    const name = document.createElement("span");
+                    name.className = "agent";
+                    name.textContent = agent + " ";
+                    li.appendChild(name);
+                }
+                li.append(text);
+                $("activity").appendChild(li);
+            }
+
+            function showOutput(markdown) {
+                $("output").className = "";
+                $("output").textContent = markdown;
+            }
+
+            function finish(message) {
+                $("status").textContent = message;
+                $("run").disabled = false;
+                source.close();
+            }
+
+            $("task").addEventListener("submit", (e) => {
+                e.preventDefault();
+                if (source) source.close();
+                const params = new URLSearchParams({ question: $("question").value.trim(), url: $("url").value.trim() });
+
+                $("activity").replaceChildren();
+                $("output").className = "empty";
+                $("output").textContent = "The report's markdown appears here.";
+                $("status").textContent = "running";
+                $("run").disabled = true;
+                resetContext();
+
+                source = new EventSource("/run?" + params);
+                source.onmessage = (msg) => {
+                    const event = JSON.parse(msg.data);
+                    if (event.type === "start") runId = event.run_id;
+                    else if (event.type === "context") showContext(runId);
+                    else if (event.type === "activity") addActivity(event.agent, event.text);
+                    else if (event.type === "done") {
+                        showOutput(event.markdown);
+                        finish("done");
+                    } else if (event.type === "error") {
+                        addActivity("", event.message, "error");
+                        finish("failed");
+                    }
+                };
+                source.onerror = () => {
+                    addActivity("", "Lost the connection to the server.", "error");
+                    finish("failed");
+                };
+            });
+        </script>
+    </body>
+</html>
