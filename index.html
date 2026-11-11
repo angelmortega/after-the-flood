@@ -108,11 +108,16 @@
                 text-transform: none;
                 letter-spacing: 0;
             }
+            .examples-label {
+                margin: 0.9rem 0 0;
+                color: var(--muted);
+                font-size: 0.8rem;
+            }
             .examples {
                 display: grid;
                 grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
                 gap: 0.6rem;
-                margin-top: 0.9rem;
+                margin-top: 0.4rem;
             }
             .examples button {
                 display: flex;
@@ -274,6 +279,40 @@
             #report h2:first-child {
                 margin-top: 0;
             }
+            #report table {
+                border-collapse: collapse;
+                margin: 0.75rem 0 0.4rem;
+                font-size: 0.9rem;
+                font-variant-numeric: tabular-nums;
+                min-width: min(100%, 30rem);
+            }
+            #report th,
+            #report td {
+                padding: 0.4rem 0.8rem;
+                border-bottom: 1px solid var(--line);
+                text-align: right;
+                white-space: nowrap;
+            }
+            #report th {
+                font-size: 0.78rem;
+                text-transform: uppercase;
+                letter-spacing: 0.03em;
+                color: #546e7a;
+                border-bottom: 2px solid var(--line);
+            }
+            #report th:first-child,
+            #report td:first-child {
+                text-align: left;
+            }
+            #report tbody tr:nth-child(even) {
+                background: var(--bg);
+            }
+            #report td:last-child {
+                font-weight: 600;
+            }
+            #report .table-wrap {
+                overflow-x: auto;
+            }
             #report a.cite {
                 font-size: 0.75em;
                 text-decoration: none;
@@ -346,6 +385,7 @@
                     <input id="question" type="text" placeholder="A place, and optionally an event: e.g. How did Hurricane Ian affect Fort Myers Beach?" autocomplete="off" />
                     <button id="run" type="submit">Research</button>
                 </form>
+                <p class="examples-label">Example questions: click one to run it, or type your own above.</p>
                 <div class="examples" id="examples">
                     <button type="button" data-q="How did Hurricane Sandy affect home values in Long Beach, NY (11561)?">
                         <span class="tag down">Didn't recover</span>
@@ -411,7 +451,7 @@
                     </div>
                     <div class="researcher" style="--c: var(--market)" data-kind="Market">
                         <h3>Market</h3>
-                        <div class="what">Zillow home values vs. control ZIPs</div>
+                        <div class="what">Zillow home values vs. similar ZIPs nearby</div>
                         <ol><li class="empty">Waiting for the lead</li></ol>
                     </div>
                 </div>
@@ -595,7 +635,7 @@
                 "called claims_summary": "Counting NFIP claims",
                 "called repeat_flooding": "Checking repeat flooding",
                 "called price_path": "Reading home values",
-                "called recovery_vs_controls": "Comparing with control ZIPs",
+                "called recovery_vs_controls": "Comparing with similar ZIPs nearby",
                 "called sql": "Running a custom query",
                 "called describe_tables": "Reading table columns",
             };
@@ -706,7 +746,7 @@
                         labels: months,
                         datasets: [
                             { label: `ZIP ${c.zip}`, data: c.months.map((m) => +(100 * m.zip_index).toFixed(1)), borderColor: css("--zip"), backgroundColor: css("--zip"), borderWidth: 2.5, pointRadius: 0, tension: 0.2 },
-                            { label: `Control ZIPs (median of ${c.controls.length})`, data: c.months.map((m) => +(100 * m.controls_index).toFixed(1)), borderColor: css("--controls"), backgroundColor: css("--controls"), borderWidth: 2, borderDash: [6, 4], pointRadius: 0, tension: 0.2 },
+                            { label: `Similar ZIPs (median of ${c.controls.length})`, data: c.months.map((m) => +(100 * m.controls_index).toFixed(1)), borderColor: css("--controls"), backgroundColor: css("--controls"), borderWidth: 2, borderDash: [6, 4], pointRadius: 0, tension: 0.2 },
                         ],
                     },
                     options: {
@@ -724,7 +764,7 @@
                     plugins: [eventLine],
                 });
                 $("chart-note").textContent =
-                    `Typical home value (Zillow ZHVI), 100 = the 3 months before the event. Controls: ${c.control_scope}, similar starting value, fewer than 10 claims in the event. [${c.source_id}]`;
+                    `Typical home value (Zillow ZHVI) from 3 years before the event, 100 = the 3 months before it. Compared with ${c.comparison_group} [${c.source_id}]`;
             }
 
             // --- Report ---
@@ -736,6 +776,13 @@
                     ids.split(/\s*,\s*/).map((id) => `<a class="cite" href="#src-${id}">${id}</a>`).join(" "),
                 );
                 $("report").innerHTML = DOMPurify.sanitize(marked.parse(linked));
+                // Wide tables scroll sideways on a phone instead of stretching the page.
+                $("report").querySelectorAll("table").forEach((t) => {
+                    const wrap = document.createElement("div");
+                    wrap.className = "table-wrap";
+                    t.replaceWith(wrap);
+                    wrap.appendChild(t);
+                });
                 if (sources) {
                     const html = DOMPurify.sanitize(marked.parse(sources));
                     $("sources-body").innerHTML = html;

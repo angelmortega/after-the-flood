@@ -362,7 +362,7 @@ def recovery_vs_controls(zip_code: str, event_date: str, event_name: str | None 
                        ELSE date_of_loss BETWEEN $event AND $loss_to END
             GROUP BY zip
         )
-        SELECT z.zip, z.city, b.baseline, coalesce(h.claims, 0) AS event_claims
+        SELECT z.zip, z.city, z.metro, b.baseline, coalesce(h.claims, 0) AS event_claims
         FROM zips z JOIN target t ON {scope}
         JOIN base b USING (zip) LEFT JOIN hit h USING (zip)
         WHERE z.zip <> $zip AND b.baseline BETWEEN $lo AND $hi AND coalesce(h.claims, 0) < 10
@@ -379,8 +379,9 @@ def recovery_vs_controls(zip_code: str, event_date: str, event_name: str | None 
         return {"error": f"Only {len(controls)} control ZIPs found for {zip_code}: too few to compare.",
                 "controls": controls, "source": _source(["zips", "zhvi", "nfip_claims"], sql1)}
 
-    # From a year before the event, so the chart shows the trend going in.
-    params2 = {"zips": [zip_code] + [c["zip"] for c in controls], "from": (event - timedelta(days=366)).isoformat(),
+    # From 3 years before the event, so the chart shows whether the ZIP moved like its comparison
+    # group going in (if it did, a split after the event stands out).
+    params2 = {"zips": [zip_code] + [c["zip"] for c in controls], "from": (event - timedelta(days=round(365.25 * 3))).isoformat(),
                "to": (event + timedelta(days=31 * months_after)).isoformat()}
     series, sql2 = _query("""
         SELECT zip, month, value FROM zhvi
@@ -414,10 +415,43 @@ def recovery_vs_controls(zip_code: str, event_date: str, event_name: str | None 
         verdict = (f"Fell {round(100 * (1 - low['relative']), 1)}% behind the controls and had not caught up "
                    f"{months_to(path[-1])} months later ({round(100 * (path[-1]['relative'] - 1), 1)}% at the end).")
     warnings, sql3 = _recovery_warnings(zip_code, event, event_name, control_scope, path, low)
+
+    # The gap at fixed points: 6 months is closest to the event itself; later points mix in more of
+    # everything else that happened to the market. The point 2 years before checks the trend going in.
+    def at(months: int):
+        target = (event + timedelta(days=round(30.44 * months))).isoformat()[:7]
+        p = next((p for p in chart if p["month"][:7] == target), None)
+        if not p:
+            return None
+        return {"months_after_event": months, "month": p["month"],
+                "zip_change_pct": round(100 * (p["zip_index"] - 1), 1),
+                "similar_zips_change_pct": round(100 * (p["controls_index"] - 1), 1),
+                "gap_points": round(100 * (p["zip_index"] - p["controls_index"]), 1)}
+
+    checkpoints = [c for c in (at(m) for m in (6, 12, 24, 36, 60)) if c]
+    # Going in: how much each rose from 2 years before the event to just before it (index 1.0).
+    before = at(-24)
+    if before:
+        p = next(p for p in chart if p["month"] == before["month"])
+        zip_rise, ctrl_rise = 100 * (1 / p["zip_index"] - 1), 100 * (1 / p["controls_index"] - 1)
+        before = {"period": "the 2 years before the event", "from_month": p["month"],
+                  "zip_change_pct": round(zip_rise, 1), "similar_zips_change_pct": round(ctrl_rise, 1),
+                  "gap_points": round(zip_rise - ctrl_rise, 1),
+                  "note": "A gap near 0 means the ZIP moved like the similar ZIPs going in."}
+    # The comparison group in plain words, with the area it comes from.
+    cities = list(dict.fromkeys(c["city"] for c in controls if c.get("city")))
+    metros = list(dict.fromkeys(c["metro"] for c in controls if c.get("metro")))
+    area = (f"the {metros[0]} metro area" if control_scope == "same metro"
+            else "other metro areas of the state (" + "; ".join(metros[:3]) + ")")
+    comparison_group = (f"{len(controls)} ZIP codes in {area} with home values within 25% of this ZIP's "
+                        f"before the event and fewer than 10 flood claims in it, e.g. {', '.join(cities[:5])}.")
     return {
         "zip": zip_code,
         "event_date": event_date,
         "baseline_value": round(base),
+        "comparison_group": comparison_group,
+        "two_years_before": before,
+        "checkpoints": checkpoints,
         "control_scope": control_scope,
         "controls": controls,
         "low_point": {**low, "months_after_event": months_to(low)},
@@ -426,7 +460,8 @@ def recovery_vs_controls(zip_code: str, event_date: str, event_name: str | None 
         "path_yearly": [p for i, p in enumerate(path) if i % 12 == 0] + ([path[-1]] if (len(path) - 1) % 12 else []),
         # For the page's chart, not the model: app.py takes it out of what the model sees.
         "chart": {"zip": zip_code, "event_date": event_date, "event_name": event_name, "baseline_value": round(base),
-                  "control_scope": control_scope, "controls": [c["zip"] for c in controls], "months": chart},
+                  "control_scope": control_scope, "comparison_group": comparison_group,
+                  "controls": [c["zip"] for c in controls], "months": chart},
         "method": recovery_vs_controls.__doc__.split("\n\n", 1)[1].strip(),
         "warnings": warnings,
         "caveats": ["This shows correlation, not causation: the controls rule out market-wide moves, not everything.",

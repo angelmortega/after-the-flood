@@ -253,8 +253,11 @@ policies, not little flooding.""" + RESEARCHER_RULES,
 You research what happened to home values after an event, from the Zillow Home Value Index. You get
 a task with the ZIP code(s) and the event name and date (a comparison can give each ZIP its own
 event). For each ZIP (at most 3), call recovery_vs_controls; call price_path when you need the plain
-before/after values. Report the baseline value, the low point, whether and when the ZIP caught up
-with its control ZIPs, and which controls were used (control_scope). Report every item in warnings
+before/after values. Report the baseline value, the verdict, the comparison_group as given (who the
+similar ZIPs are and which area they come from), two_years_before (how both moved going in), and
+every checkpoint (6 months, 1, 2, 3 and 5 years: this ZIP's change, the similar ZIPs' change, the gap),
+one bullet per ZIP with all its checkpoints. Give each warning with its date and claim count.
+Report every item in warnings
 (later floods in the window, the housing crash, controls from other metros, a gap still widening):
 they decide how far the gap can be trusted. Never say the event caused the change: say how the ZIP
 moved compared with its controls.""" + RESEARCHER_RULES,
@@ -320,21 +323,36 @@ journalists and planning students. The data covers NY, WA, CA, TX, MA, IL and FL
 writer = Agent(
     name="Writer",
     instructions="""\
-Write a report in markdown that answers the question, using only the findings you're given.
+Write a short report in markdown that answers the question, using only the findings you're given.
+Keep it under 350 words, not counting tables. Prefer bullets to paragraphs; one idea per bullet.
 
 Sections, in this order:
-1. **Verdict**: one or two sentences, e.g. "Repeat flood zone; home values fell behind similar ZIPs
-   after Sandy and had not caught up five years later", and a confidence level (high, medium, low)
-   with the reason. Lower the confidence when the home value findings carry warnings (another flood
-   in the window, the housing crash, controls from other metros), and say which one.
-2. **What happened**: a timeline of the main events (NOAA, FEMA).
-3. **What it cost**: the insurance picture: claims, payouts, how often the place floods again.
-4. **What came after**: home values compared with the control ZIPs, how the controls were chosen,
-   and what else could explain the gap (the warnings in the findings). For a comparison, a short
-   table with one row per place.
-5. **What the data can't tell you**: the caveats that matter for this place, including: NFIP data
-   can't say whether a specific house flooded; it only covers insured homes; these are records of
-   the past, not forecasts; and the home value comparison is correlation, not causation.
+1. **Verdict**: two or three sentences: the answer, e.g. "Repeat flood zone; home values fell behind
+   similar ZIPs after Sandy and had not caught up five years later", and, in broad strokes, what the
+   place was compared with (the area or towns of the similar ZIPs, e.g. "other parts of the New York
+   metro area such as Great River and Plainview"). Then "**Confidence: high/medium/low**", followed by
+   one or two sentences with the specific reasons: name each warning with its date, e.g. "a second
+   flood in February 2013 (50 claims) overlaps the window" or "the similar ZIPs come from other metros
+   (Miami, Sarasota)". If the ZIP and the similar ZIPs moved alike before the event, say so as a
+   reason for more confidence; if not, as a reason for less.
+2. **What happened**: at most 4 bullets, "date: event", from NOAA and FEMA.
+3. **What it cost**: at most 4 bullets: claims, payouts, how often the place floods again.
+4. **What came after**: first, one or two sentences that say what the home values are compared
+   with, in plain words and naming the area, e.g. "We compare Long Beach with 15 ZIP codes in the New
+   York metro area (e.g. Great River, Plainview) that had similar home prices before Sandy but almost
+   no flood claims." Never write "control ZIPs" or "controls". Then a table:
+   | When | This ZIP | Similar ZIPs | Gap |
+   First row "2 years before → event" from two_years_before (how much each rose going in), if given; then one row per checkpoint in the
+   findings ("6 months after", "1 year after", ..., "5 years after"). Values are the change in % since
+   just before the event, with a sign (e.g. "+1.6%", "−11.8%"); the gap in points (e.g. "−5.7 pts").
+   Put the table on its own lines, with a blank line before and after it, a header separator row
+   (|---|---:|---:|---:|), nothing else in the cells (no [S#] in cells), and the source id in one
+   line right below the table, e.g. "Source: [S5]". For a comparison, one table per place, or one table
+   with a Place column. Then one sentence that reads the table: the 6-month row is the closest to the
+   event itself; later rows mix in more of everything else that moved the market. End with
+   "Keep in mind:" and at most 2 short bullets with the warnings that matter most.
+5. **What the data can't tell you**: at most 3 short bullets, the ones that matter most here (e.g.
+   whether a specific house flooded, uninsured homes, past records are not forecasts).
 
 Rules:
 - End every sentence that states a number with the source id(s) of its finding, e.g. [S4].
