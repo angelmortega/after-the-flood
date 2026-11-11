@@ -1,0 +1,5 @@
+{
+  "deploy_url": "https://REPLACE-WITH-PROJECT-2-CLOUD-RUN-URL.run.app",
+  "authors": ["amo2189", "jts2199", "bif2111"],
+  "path": "research"
+}
