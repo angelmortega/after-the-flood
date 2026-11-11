@@ -1,115 +1,176 @@
-# After the Flood: A Disaster Recovery Research Agent
+# After the Flood
 
-**Course:** Agentic AI, Project 2 (Data Exploration Agent)
-**Path:** Deep Research (`"path": "research"`)
-**Team:** _add UNIs_
+A deep research agent for flood-prone places. Name a place (a ZIP code, city or county) and optionally a storm, and it finds out:
 
-## The idea
+1. **What happened:** which storms and floods hit, when, and how bad they were (NOAA Storm Events, FEMA disaster declarations).
+2. **What it cost:** National Flood Insurance Program (NFIP) claims and payouts, and how often the place floods again.
+3. **What came after:** did typical home values fall behind similar ZIP codes that the storm barely hit, and did they catch up?
 
-You name a place (a ZIP code, a county or a city) and optionally an event (e.g. "Hurricane Ian", "Ida 2021"). The agent finds out:
+It writes a cited report with a verdict, a claims map and a recovery chart, and says what the data can't tell you.
 
-1. **What happened:** which storms or floods hit the place, when, and how bad they were (damage, deaths, written NOAA descriptions).
-2. **What it cost:** how many flood insurance claims there were, how much was paid, and whether the area floods again and again.
-3. **What came after:** did home values dip and recover, and how long did it take compared with nearby areas that weren't hit?
+**Who it's for:** people buying or renting a home in a flood-prone area, local journalists, and city-planning students. Example: someone thinking about buying in Long Beach, NY wants to know how often it floods, how bad Sandy was, and whether prices came back.
 
-Then it writes a cited report with a "recovery verdict" for the place.
+**Live app:** see `deploy_url` in [submission.json](submission.json). Columbia sign-in required.
 
-**Target user:** People buying or renting a home in a flood-prone area, local journalists, and city-planning students. Example: someone thinking about buying in Rockaway, Queens wants to know how often it floods, how bad it gets, and whether prices bounce back.
+## How it works
 
-**Why it fits the assignment:**
-- The model knows big storms (Sandy, Katrina) in general, but not ZIP-level claim counts, payouts or price paths. A no-tools answer will be vague or made up, so the README baseline comparison is easy to show.
-- All the data is free, official and mostly needs no API key.
-- No team on the sign-up sheet uses FEMA, flood insurance or home-value data.
+Deep Research path: a Lead plans, three Researchers explore in parallel, and a Writer reports.
 
-## Data sources (one per team member)
+```
+question ─► Lead ──(vague?)──► clarifying questions back to the user
+             │ resolve_place, claims_summary (finds the events that mattered and their peak dates)
+             │
+             ├─► Hazard Researcher     NOAA storm events + FEMA declarations, by county  ┐
+             ├─► Insurance Researcher  NFIP claims, payouts, repeat flooding, by ZIP     ├ parallel, fresh contexts
+             └─► Market Researcher     Zillow home values vs. control ZIPs               ┘
+             │
+             │ gap in the findings? one more round for just that part
+             ▼
+           Writer ─► report: verdict, timeline, insurance picture, price recovery, what the data can't tell you
+```
 
-| Source | What it gives | Access | Size / limits |
-|---|---|---|---|
-| **OpenFEMA: NFIP Redacted Claims (v2)** | ~2.7M flood insurance claims since 1978: date of loss, ZIP, county, census tract, flood zone, amounts paid (building and contents), building type, elevation | REST API, **no key**: `https://www.fema.gov/api/open/v2/FimaNfipClaims` (OData filters such as `$filter=reportedZipCode eq '11693'`). Full CSV/Parquet download at fema.gov/openfema-data-page | Full file is a few GB, so pre-filter to your states and store as Parquet in GCS. API returns up to 10,000 rows per call (use `$skip`) |
-| **OpenFEMA: Disaster Declarations Summaries (v2)** | Every federal disaster declaration: type, incident dates, state, county, program types | **No key**: `https://www.fema.gov/api/open/v2/DisasterDeclarationsSummaries` | Small (~65k rows), can commit to the repo |
-| **NOAA NCEI Storm Events Database** | Every significant storm event by county/zone since 1950: event type, dates, deaths, injuries, property and crop damage, **written event and episode narratives** | Bulk yearly CSVs, **no key**: `https://www.ncei.noaa.gov/pub/data/swdi/stormevents/csvfiles/` (`StormEvents_details-ftp_v1.0_dYYYY_*.csv.gz`) | ~1.5M rows total. Damage is stored as text ("25K", "1.2M") and needs parsing |
-| **Zillow Home Value Index (ZHVI)** | Monthly typical home value by ZIP, county and metro since 2000 | Free CSV at `https://www.zillow.com/research/data/` (ZHVI All Homes, smoothed, seasonally adjusted, by ZIP) | ~30k ZIPs × ~300 months; a wide CSV that needs reshaping to long format |
-
-**Optional stretch:** A **Census ACS 5-year** API for income and renter share by ZIP (free key), to ask "do poorer ZIPs recover more slowly?" Or **FEMA National Risk Index** scores per census tract.
-
-## Architecture
-
-Recommended: the Deep Research path, with a small **DuckDB** layer under each Researcher's tools. Build Parquet files offline and load them from GCS at startup.
-
-### Offline build step (`build_data.py`)
-- Download NFIP claims, filter to the target states (or the whole US if it fits) and save as Parquet.
-- Parse NOAA damage strings ("2.5M" → 2,500,000) and turn yearly files into one table.
-- Reshape ZHVI from wide to long: `(zip, month, value)`.
-- Build **join tables**: ZIP → county FIPS (HUD USPS ZIP–County crosswalk, free with a HUD account, or the Census ZCTA relationship file).
-- Upload everything to a GCS bucket. The app downloads it at startup.
-
-### Lead
-- If the input is vague ("Is Florida safe?"), asks 1 to 3 clarifying questions: which place (ZIP/city), which time period, buying or renting.
-- Resolves the place to ZIP(s) and a county FIPS code, and picks the events to look at.
-- Sends work to the three Researchers in parallel in one turn.
-- If findings leave a gap (e.g. NOAA shows a big event but there are no NFIP claims), runs one more round, e.g. "check the neighboring ZIPs" or "check whether the area was declared a disaster."
-- Cap: 2 rounds.
-
-### Researchers (x3, fresh contexts)
-1. **Hazard Researcher (NOAA + FEMA declarations):** events in the county, their damage, written descriptions, and federal declarations.
-2. **Insurance Researcher (NFIP):** claim counts, amounts paid, repeat-flooding patterns (same ZIP flooding in several years), and flood-zone mix.
-3. **Market Researcher (Zillow):** home-value path before and after each event, recovery time, and a comparison with **control ZIPs** (nearby ZIPs in the same metro with few claims).
-
-Each returns findings in a shared format: `claim, number, source table/endpoint, query used, caveat`.
-
-### Writer
-Writes the report:
-1. **Verdict:** e.g. "Repeat flood zone; prices recovered within 18 months after Sandy" + confidence level
-2. **Timeline of events** (with NOAA and FEMA citations)
-3. **Insurance picture** (claims, payouts, how often)
-4. **Price recovery** with a chart (before/after, compared with control ZIPs)
-5. **What the data can't tell you** (see below)
-
-## Frontend ideas
-- Search box for a ZIP or address, plus an event dropdown
-- A **map** (Leaflet + free OpenStreetMap tiles) with ZIPs colored by total claims
-- A **"recovery curve"** chart: the ZIP's home value versus control ZIPs, with event dates marked by vertical lines
-- A live panel showing the three Researchers working side by side
-- An "About" section saying what the agent explores, who it's for and how to use it (required)
-
-## README sample queries
-
-1. **"How did Hurricane Sandy affect home values in Rockaway, Queens (11693/11694)?"** Combines NFIP claims in 2012, the NOAA Sandy description and the ZHVI recovery path.
-2. **"Which ZIP codes in Harris County, TX have flooded the most since 2000?"** Mostly NFIP: claim counts by ZIP and year, cross-checked with NOAA flood events.
-3. **"Is Fort Myers Beach safe to buy in?"** A vague question that triggers clarification. After that, the answer covers Hurricane Ian (2022) claims and the ZHVI path, and says what the data can't tell you.
-
-For each one: the expected answer, the table or endpoint it comes from, and the no-tools answer side by side with the agent's.
-
-## What the data can't answer (the agent must say so)
-- **Whether a specific house flooded:** NFIP data is anonymized to ZIP or census tract level.
-- **Uninsured damage:** NFIP only covers insured properties, and many flooded homes have no flood policy. Low claim counts can mean low coverage, not low risk.
-- **Causation:** a price drop after a storm could also come from interest rates or the wider market. That's why control ZIPs matter, and even then the result is correlation.
-- **Future risk:** these records are historical, not climate forecasts.
-- **Rentals:** ZHVI tracks home values. Zillow's rent index (ZORI) only starts in 2015 and covers fewer ZIPs.
-
-## Team split
-
-| Person | Owns |
+| Requirement | Where |
 |---|---|
-| Person 1 | NOAA Storm Events + FEMA declarations data, Hazard Researcher, Lead agent and `/chat` endpoint |
-| Person 2 | NFIP claims data (biggest dataset), offline build step, GCS upload, Insurance Researcher |
-| Person 3 | Zillow ZHVI + control-ZIP logic, Market Researcher, Writer, frontend (map + chart), Cloud Run deploy |
+| Three or more agent shapes | `lead`, `researcher_agents` (hazard, insurance, market) and `writer` in [app.py](app.py) |
+| Lead fans out in one turn, researchers run in parallel in fresh contexts | The Lead calls `research` once per researcher in the same turn; each call runs a fresh clone of that researcher (`research()` in app.py) |
+| Lead goes back for more when there's a gap, up to a cap | Step 4 of the Lead's prompt: one extra round. `MAX_RESEARCHERS = 6` is enforced in code; every agent has a `max_turns` |
+| Vague questions get clarification | The Lead replies `CLARIFY:` with 1 to 3 questions; the page (and `/chat`) asks them before researching |
+| Accurate citations | Every tool result gets a source id (`[S4]`); the report ends with each cited source's tool call, tables and exact SQL |
+| Admits what the data can't answer | Every tool returns caveats; the market tool returns warnings (later floods, the 2007-2011 housing crash, controls from other metros); the report always ends with "What the data can't tell you" |
 
-## Main development challenges
+**Control ZIPs** (the most "research" part, in `recovery_vs_controls` in [tools.py](tools.py)): to say whether a ZIP's home values recovered, we compare it with ZIPs in the same metro whose typical value was within 25% of it before the event and that had fewer than 10 NFIP claims in the event. The 15 closest by value are used. If the storm hit the whole metro, controls come from other metros in the state, and the agent says so. The relative index is (ZIP value / its pre-event baseline) / median over controls of the same ratio; the ZIP has recovered when that's back to 0.99.
 
-1. **Joining across geographies.** NFIP uses ZIP, census tract and county. NOAA uses county FIPS *or* forecast zones (a weather-service geography that is not a county). Zillow uses ZIP. You need a ZIP ↔ county crosswalk, and NOAA zone events (`CZ_TYPE = 'Z'`) need a zone → county mapping (NWS publishes one). Get this wrong and the agent joins the wrong places.
-2. **NFIP data size and gaps.** The full claims file is several GB. Pre-filter, use Parquet, and query with DuckDB. Some ZIP fields are blank or misspelled, so fall back to county.
-3. **Messy NOAA damage fields.** Values like `"10.00K"`, `"1.5M"`, `"0"` or blank need parsing. Before ~1996 only some event types were recorded, so trends over long periods are skewed. The agent should know this.
-4. **Choosing control ZIPs fairly.** "Prices recovered" only means something compared with similar ZIPs that weren't hit. Use a simple rule (same metro, similar starting price, low claims) and explain it in the README. This is the most "research-y" part and good for the creativity grade.
-5. **Matching event names to records.** Users say "Sandy", but NFIP has no storm-name column for most claims, only the date of loss. Map named storms to date windows and states (FEMA declarations help here).
-6. **Response time.** Three DuckDB-backed Researchers are fast, but the LLM turns add up. Cap Researchers at ~5 tool calls, set the Cloud Run timeout to 300s, and run gunicorn with `--timeout 300` (or uvicorn).
-7. **Startup time on Cloud Run.** Downloading a large Parquet file from GCS on every cold start is slow. Keep the deployed files small (e.g. filtered to coastal states), or set minimum instances to 1.
-8. **Not overclaiming.** The Writer must not say "the flood caused prices to drop." Use a prompt rule plus a check that every number in the report comes from a tool result.
+## Data
 
-## Submission checklist
-- [ ] Sign-up sheet entry (dataset + questions + path)
-- [ ] `app.py`, `pyproject.toml`, `uv.lock` at repo root
-- [ ] `README.md`: description, target user, data sources and how to load them, 3 sample queries with expected answers and no-tools baseline
-- [ ] `submission.json` with `deploy_url`, all `authors`, `"path": "research"`
-- [ ] Cloud Run with continuous deploy from GitHub; data in GCS if > 100 MB
-- [ ] Graders added as collaborators if the repo is private: codeboi07, bhuvighosh3, nniishhh, x
+One source per team member, plus Census tables to join them. All free, official, no API keys.
+
+| Source | Table(s) | What it gives | Where it came from |
+|---|---|---|---|
+| OpenFEMA NFIP Redacted Claims v3 | `nfip_claims` | 1.18M flood insurance claims since 1978: date of loss, ZIP, county, flood zone, amounts paid | `https://www.fema.gov/api/open/v3/NfipClaims` (paged, no key) |
+| OpenFEMA Disaster Declarations Summaries v2 | `declarations` | Federal disaster declarations by county | `https://www.fema.gov/api/open/v2/DisasterDeclarationsSummaries.parquet` |
+| NOAA NCEI Storm Events Database | `storm_events`, `storm_event_counties` | Storm events since 1996: type, deaths, injuries, damage, written narratives | Yearly CSVs at `https://www.ncei.noaa.gov/pub/data/swdi/stormevents/csvfiles/`; forecast zones mapped to counties with the NWS zone-county file |
+| Zillow Home Value Index (ZHVI) | `zhvi`, `zips` | Typical home value by ZIP and month since 2000 (all homes, middle tier, smoothed, seasonally adjusted) | `https://files.zillowstatic.com/research/public_csvs/zhvi/` |
+| Census ZCTA-county relationships and Gazetteer | `zip_county`, `zip_centroids` | ZIP to county joins, ZIP locations for the map | `https://www2.census.gov/geo/docs/maps-data/data/` |
+
+Coverage: NY, WA, CA, TX, MA, IL and FL. Row counts, source URLs and the build date are in [data/manifest.json](data/manifest.json).
+
+**Loading it:** the built Parquet files are committed in `data/` (about 64 MB, every file under GitHub's 100 MB limit), so the app runs as is. To rebuild them from the sources:
+
+```bash
+uv run build_data.py              # everything (downloads a few GB into data/raw/, cached)
+uv run build_data.py nfip zhvi    # only some steps
+```
+
+To cover more states, edit `STATES` at the top of [build_data.py](build_data.py).
+
+## Run it
+
+```bash
+cp .env.example .env        # set VERTEXAI_PROJECT to a GCP project with Vertex AI enabled
+gcloud auth application-default login
+uv run app.py               # http://localhost:8000
+uv run tools.py             # the research tools on the sample queries, no model needed
+```
+
+Models: Gemini 3.5 Flash (Lead, Writer) and Gemini 3.5 Flash Lite (Researchers) on Vertex AI.
+
+### API
+
+`POST /chat` keeps Project 1's response shape. Every tool call in the run, from the Lead and from every Researcher, is in `tool_calls` with the `agent` that made it.
+
+```bash
+curl -X POST localhost:8000/chat -H 'Content-Type: application/json' \
+  -d '{"message": "How did Hurricane Sandy affect home values in Long Beach, NY (11561)?"}'
+```
+
+```json
+{
+  "type": "done",
+  "reply": "**Verdict**: ... [S3] ...\n\n## Sources\n...",
+  "questions": [],
+  "tool_calls": [
+    {"agent": "Lead", "name": "resolve_place", "arguments": {"place": "11561"}, "result": {"source_id": "S1", "zips": ["11561"], "...": "..."}},
+    {"agent": "Insurance Researcher 2", "name": "claims_summary", "arguments": {"zips": ["11561"], "...": "..."}, "result": {"...": "..."}}
+  ],
+  "messages": [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}],
+  "run_id": "..."
+}
+```
+
+If `type` is `"clarify"`, `reply` holds the Lead's questions. Answer by posting the returned `messages` with your answer as the new `message`. The page itself uses `GET /run`, which streams the same run as server-sent events.
+
+## Sample queries
+
+Expected answers come straight from the tables (run `uv run tools.py` to see them). The no-tools baseline is the same model (Gemini 3.5 Flash) with no tools and no system prompt. To regenerate the baseline and agent answers below, run `uv run sample_answers.py`.
+
+### 1. "How did Hurricane Sandy affect home values in Long Beach, NY (11561)?"
+
+**Expected answer:**
+- **Sandy's claims:** 6,505 NFIP claims in 11561, $470M paid, median $49,482 per claim, peak date of loss 2012-10-29. *Table: `nfip_claims`*
+- **Federal declarations:** emergency EM-3351-NY and major disaster DR-4085-NY covered Nassau County. *Table: `declarations`*
+- **Repeat flooding:** 28 years since 1978 with 10 or more claims, 14 of them since 2000. *Table: `nfip_claims`*
+- **Home values vs. 15 similar ZIPs in the New York metro:** the pre-storm baseline was $470,646. 11561 fell 11.8% behind the controls and had not caught up 61 months later (still 11.5% behind). The agent should also flag the 2013 flooding inside the comparison window. *Tables: `zhvi`, `zips`, `nfip_claims`*
+
+<!-- answer:q1:baseline -->
+**No tools (Gemini 3.5 Flash, no system prompt):** _Run `uv run sample_answers.py` to fill this in._
+<!-- /answer:q1:baseline -->
+
+<!-- answer:q1:agent -->
+**Agent:** _Run `uv run sample_answers.py` to fill this in._
+<!-- /answer:q1:agent -->
+
+### 2. "Which ZIP codes in Harris County, TX have flooded the most since 2000?"
+
+**Expected answer:**
+- **Top ZIPs by NFIP claims since 2000:**
+  1. 77096: 5,332 claims, $667M paid
+  2. 77089: 4,224 claims, $233M
+  3. 77037: 3,558 claims, $142M
+  4. 77088: 3,445 claims
+  5. 77040: 3,220 claims
+
+  *Table: `nfip_claims`*
+- **County-wide since 2000:** 126,536 claims, $8.2B paid. *Table: `nfip_claims`*
+- **Biggest events:** Hurricane Harvey (48,992 claims, $5.37B), Tropical Storm Allison (22,394 claims) and Hurricane Ike (13,360 claims). *Table: `nfip_claims`*
+- **Repeat flooding:** each of the top three ZIPs had claims in 26 to 27 of the years since 2000. *Table: `nfip_claims`*
+
+<!-- answer:q2:baseline -->
+**No tools (Gemini 3.5 Flash, no system prompt):** _Run `uv run sample_answers.py` to fill this in._
+<!-- /answer:q2:baseline -->
+
+<!-- answer:q2:agent -->
+**Agent:** _Run `uv run sample_answers.py` to fill this in._
+<!-- /answer:q2:agent -->
+
+### 3. "Is it safe to buy a beach house in Florida?" (vague: tests clarification)
+
+**Expected answer:** the Lead doesn't research a whole state. It asks which place (and possibly the period, or buying vs. renting). Answered with *"Fort Myers Beach (33931), after Hurricane Ian. Buying."*, the report should say:
+- **Ian's claims:** 2,611 NFIP claims in 33931, $576M paid, median about $122,000 per claim, peak date 2022-09-28. 86% of claims were in FEMA high-risk zones, and 44% were primary residences. *Table: `nfip_claims`*
+- **Federal declarations:** EM-3584-FL and major disaster DR-4673-FL covered Lee County. *Table: `declarations`*
+- **Repeat flooding:** 20 years with 10 or more claims, 13 of them since 2000. *Table: `nfip_claims`*
+- **Home values:** the pre-Ian baseline was $692,662. 33931 fell 30.1% behind its controls and had not caught up 48 months later. *Tables: `zhvi`, `zips`, `nfip_claims`*
+- **Lower confidence, with three warnings:** Hurricanes Helene (447 claims) and Milton (770 claims) hit inside the window in 2024, and the controls came from other Florida metros.
+- **What it can't answer:** the agent should say it can't tell whether a specific house is safe or predict future storms.
+
+<!-- answer:q3:baseline -->
+**No tools (Gemini 3.5 Flash, no system prompt):** _Run `uv run sample_answers.py` to fill this in._
+<!-- /answer:q3:baseline -->
+
+<!-- answer:q3:agent -->
+**Agent:** _Run `uv run sample_answers.py` to fill this in._
+<!-- /answer:q3:agent -->
+
+## What the data can't answer
+
+The agent says so when these come up:
+
+- **Whether a specific house flooded:** NFIP claims are anonymized to ZIP and census block group.
+- **Uninsured damage:** only insured homes file claims, so few claims can mean few policies, not little flooding.
+- **Why prices moved:** the control-ZIP comparison rules out market-wide moves, but it's correlation, not causation. Later floods and the 2007-2011 housing crash are flagged when they fall in the window.
+- **The future:** these are records of the past, not climate forecasts.
+- **Places outside NY, WA, CA, TX, MA, IL and FL, and NOAA events before 1996** (earlier years only recorded tornadoes, wind and hail).
+- **Rents:** ZHVI tracks home values, not rents.
+
+## Team
+
+amo2189, jts2199, bif2111

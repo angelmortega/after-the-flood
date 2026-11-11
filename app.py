@@ -12,7 +12,8 @@ from agents import Agent, ModelSettings, RunContextWrapper, Runner, function_too
 from agents.extensions.models.litellm_model import LitellmModel
 from dotenv import load_dotenv
 from fastapi import FastAPI
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from pydantic import BaseModel
 
 import tools
 from context_panel import AgentContexts, PanelHooks, add_context_panel
@@ -378,6 +379,11 @@ async def deep_research(question: str, clarification: str, hooks: PanelHooks) ->
     if reply.startswith("CLARIFY:") and not research_run.findings:
         questions = [q.strip(" -•") for q in reply.removeprefix("CLARIFY:").splitlines() if q.strip(" -•")]
         return {"type": "clarify", "questions": questions}
+    if not research_run.findings:
+        # No researcher ran: a Writer with nothing to cite would only guess.
+        return {"type": "done", "markdown": "I couldn't research this question with the data I have. It covers floods "
+                "in NY, WA, CA, TX, MA, IL and FL: try naming a ZIP code, city or county there.",
+                "charts": [], "map": None}
 
     # 2. Write: one call, outside the loop. The Writer sees only the question and the findings.
     findings = "\n\n---\n\n".join(research_run.findings)
@@ -434,6 +440,92 @@ async def run(question: str, clarification: str = ""):
             task.cancel()  # the page closed the stream: stop spending tokens
 
     return StreamingResponse(events(), media_type="text/event-stream")
+
+
+# --- /chat: the Project 1 response shape, for graders and scripts ---
+
+# Cloud Run cuts a request at 300 s: answer before that, with whatever tool calls ran.
+CHAT_TIMEOUT = 285
+
+
+def _parse(value):
+    """Tool arguments and results arrive as JSON text: return them as JSON when they are."""
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except ValueError:
+            return value
+    return value
+
+
+class ChatHooks(PanelHooks):
+    """PanelHooks that also keeps every tool call, from the Lead and every Researcher, with the
+    agent that made it. Researchers run with the same hooks, so their calls land here too."""
+
+    def __init__(self, contexts: AgentContexts):
+        super().__init__(contexts, lambda event: None)  # no page to stream to
+        self.tool_calls: list[dict] = []
+
+    async def on_tool_end(self, context, agent, tool, result):
+        self.tool_calls.append({
+            "agent": agent.name,
+            "name": tool.name,
+            "arguments": _parse(getattr(context, "tool_arguments", None)),
+            "result": _parse(result),
+        })
+
+
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+
+class ChatRequest(BaseModel):
+    """Either a message, or the conversation so far (as /chat returned it) plus an optional new message."""
+
+    message: str | None = None
+    messages: list[ChatMessage] = []
+
+
+@app.post("/chat")
+async def chat(request: ChatRequest):
+    """Research one question and answer with one JSON response:
+        {"reply", "type": "done" | "clarify" | "error", "questions", "tool_calls", "messages", "run_id"}
+    tool_calls lists every tool call in the run, each with the agent that made it.
+    If type is "clarify", reply with the returned messages plus your answer as the new message."""
+    history = [m.model_dump() for m in request.messages]
+    if request.message:
+        history.append({"role": "user", "content": request.message})
+    asked = [m["content"].strip() for m in history if m["role"] == "user" and m["content"].strip()]
+    if not asked:
+        return JSONResponse({"error": "Send a message, e.g. {\"message\": \"How did Hurricane Ian affect Fort Myers Beach?\"}"},
+                            status_code=400)
+    # The first user message is the question; any later ones answer the Lead's clarifying questions.
+    question, clarification = asked[0], " ".join(asked[1:])
+
+    run_id = str(uuid.uuid4())
+    sessions[run_id] = AgentContexts()
+    hooks = ChatHooks(sessions[run_id])
+    try:
+        result = await asyncio.wait_for(deep_research(question, clarification, hooks), CHAT_TIMEOUT)
+    except Exception as e:
+        message = (f"The research took longer than {CHAT_TIMEOUT} s." if isinstance(e, asyncio.TimeoutError)
+                   else f"{type(e).__name__}: {str(e)[:500]}")
+        return JSONResponse({"type": "error", "reply": message, "questions": [], "tool_calls": hooks.tool_calls,
+                             "messages": history, "run_id": run_id}, status_code=500)
+
+    if result["type"] == "clarify":
+        reply = "Before I research this:\n" + "\n".join(f"- {q}" for q in result["questions"])
+    else:
+        reply = result["markdown"]
+    return {
+        "type": result["type"],
+        "reply": reply,
+        "questions": result.get("questions", []),
+        "tool_calls": hooks.tool_calls,
+        "messages": history + [{"role": "assistant", "content": reply}],
+        "run_id": run_id,
+    }
 
 
 def billed_project() -> str:
