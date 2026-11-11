@@ -55,9 +55,11 @@ def _answer(ctx: RunContextWrapper[Research], name: str, args: dict, fn, **kwarg
         return json.dumps({"error": f"{name} failed: {type(e).__name__}: {e}"})
     if "error" in result:
         return json.dumps(result, default=str)
-    source_id = f"S{len(ctx.context.sources) + 1}"
+    # The same call twice (e.g. a second researcher round) keeps its first source id and chart.
+    repeat = next((sid for sid, s in ctx.context.sources.items() if s["tool"] == name and s["args"] == args), None)
+    source_id = repeat or f"S{len(ctx.context.sources) + 1}"
     ctx.context.sources[source_id] = {"tool": name, "args": args, **result.get("source", {})}
-    if "chart" in result:
+    if "chart" in result and not repeat:
         # The recovery curve goes straight to the page; the model gets the yearly summary.
         chart = {**result["chart"], "source_id": source_id}
         ctx.context.charts.append(chart)
@@ -93,7 +95,13 @@ def _send_map(run: "Research", place: dict) -> None:
         data = tools.claims_map(counties, place["zips"])
     except Exception:
         return  # the map is a nicety: never fail the research over it
-    run.map = {"zips": data["zips"], "counties": place["counties"]}
+    # A comparison resolves several places: keep the ones already drawn.
+    zips = {z["zip"]: z for z in (run.map or {}).get("zips", [])}
+    for z in data["zips"]:
+        z["highlight"] = z["highlight"] or zips.get(z["zip"], {}).get("highlight", False)
+        zips[z["zip"]] = z
+    counties = {c["county_fips"]: c for c in (run.map or {}).get("counties", []) + place["counties"]}
+    run.map = {"zips": list(zips.values()), "counties": list(counties.values())}
     run.hooks.emit({"type": "map", **run.map})
 
 
@@ -232,7 +240,8 @@ biggest ones, and the matching federal declarations.""" + RESEARCHER_RULES,
         instructions="""\
 You research what floods cost in a place, from NFIP flood insurance claims. You get a task with the
 ZIP codes and/or county FIPS code and dates. Report claim counts and payouts by event, how often the
-place floods again (repeat_flooding), and the flood-zone mix. Remember that few claims can mean few
+place floods again (repeat_flooding), and the flood-zone mix. When the task compares places, call
+repeat_flooding once per place, never on their ZIPs combined. Remember that few claims can mean few
 policies, not little flooding.""" + RESEARCHER_RULES,
         model=RESEARCHER_MODEL, model_settings=SETTINGS,
         tools=[claims_summary, repeat_flooding, sql, describe_tables],
@@ -241,11 +250,13 @@ policies, not little flooding.""" + RESEARCHER_RULES,
         name="Market Researcher",
         instructions="""\
 You research what happened to home values after an event, from the Zillow Home Value Index. You get
-a task with the ZIP code(s) and the event name and date. For each ZIP (at most 3), call
-recovery_vs_controls; call price_path when you need the plain before/after values. Report the
-baseline value, the low point, whether and when the ZIP caught up with its control ZIPs, and which
-controls were used (control_scope). Never say the event caused the change: say how the ZIP moved
-compared with its controls.""" + RESEARCHER_RULES,
+a task with the ZIP code(s) and the event name and date (a comparison can give each ZIP its own
+event). For each ZIP (at most 3), call recovery_vs_controls; call price_path when you need the plain
+before/after values. Report the baseline value, the low point, whether and when the ZIP caught up
+with its control ZIPs, and which controls were used (control_scope). Report every item in warnings
+(later floods in the window, the housing crash, controls from other metros, a gap still widening):
+they decide how far the gap can be trusted. Never say the event caused the change: say how the ZIP
+moved compared with its controls.""" + RESEARCHER_RULES,
         model=RESEARCHER_MODEL, model_settings=SETTINGS,
         tools=[recovery_vs_controls, price_path, sql, describe_tables],
     ),
@@ -287,11 +298,14 @@ journalists and planning students. The data covers NY, WA, CA, TX, MA, IL and FL
    "CLARIFY:" followed by 1 to 3 short questions, one per line (which place, which period or event,
    buying or renting), and nothing else. Otherwise don't ask: work with what you have.
 2. Call resolve_place. For a neighborhood, pass its ZIP codes. Then call claims_summary on its ZIPs
-   (or county) grouped by event, to find the floods that mattered and their peak dates.
+   (or county) grouped by event, to find the floods that mattered and their peak dates. If the
+   question compares places, do this for each place (in the same turn), and keep both places in
+   every researcher task below, each with its own event.
 3. Call research three times in the same turn, one per researcher (hazard, insurance, market), so
    they work in parallel. Give each a self-contained task: the ZIP codes, county FIPS code(s), the
    events with their dates (YYYY-MM-DD), and what to find out. For market, pick at most 3 ZIPs that
-   have home values, and the most important event (or the one the user asked about).
+   have home values, and the most important event (or the one the user asked about). Use the peak
+   loss date from claims_summary as the event date.
 4. Read the findings. If there's a gap (e.g. NOAA shows a big event but there are no claims, or a
    ZIP has no home values), call research again for just that part. One extra round at most.
 5. Reply DONE and nothing else: a writer writes the report.""",
@@ -310,10 +324,13 @@ Write a report in markdown that answers the question, using only the findings yo
 Sections, in this order:
 1. **Verdict**: one or two sentences, e.g. "Repeat flood zone; home values fell behind similar ZIPs
    after Sandy and had not caught up five years later", and a confidence level (high, medium, low)
-   with the reason.
+   with the reason. Lower the confidence when the home value findings carry warnings (another flood
+   in the window, the housing crash, controls from other metros), and say which one.
 2. **What happened**: a timeline of the main events (NOAA, FEMA).
 3. **What it cost**: the insurance picture: claims, payouts, how often the place floods again.
-4. **What came after**: home values compared with the control ZIPs, and how the controls were chosen.
+4. **What came after**: home values compared with the control ZIPs, how the controls were chosen,
+   and what else could explain the gap (the warnings in the findings). For a comparison, a short
+   table with one row per place.
 5. **What the data can't tell you**: the caveats that matter for this place, including: NFIP data
    can't say whether a specific house flooded; it only covers insured homes; these are records of
    the past, not forecasts; and the home value comparison is correlation, not causation.
@@ -324,6 +341,9 @@ Rules:
   e.g. don't turn "44.2% primary residences" and "2,611 claims" into a count of homes.
 - Write for a home buyer, not a programmer: never mention field names, "null", or tool names.
 - Never say the flood caused a price change: say how the ZIP's values moved compared with similar ZIPs.
+- If the question asks why, say the data can't show why, then list the differences it does show
+  (e.g. share of primary residences, how often each place floods, the warnings) as differences, not
+  explanations: no "because", "may relate to" or "may have recovered faster since".
 - Write plain, specific sentences. No "profoundly", "pivotal", "it is worth noting".""",
     model=MODEL,
     model_settings=SETTINGS,

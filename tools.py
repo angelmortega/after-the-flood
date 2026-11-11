@@ -413,6 +413,7 @@ def recovery_vs_controls(zip_code: str, event_date: str, event_name: str | None 
     else:
         verdict = (f"Fell {round(100 * (1 - low['relative']), 1)}% behind the controls and had not caught up "
                    f"{months_to(path[-1])} months later ({round(100 * (path[-1]['relative'] - 1), 1)}% at the end).")
+    warnings, sql3 = _recovery_warnings(zip_code, event, event_name, control_scope, path, low)
     return {
         "zip": zip_code,
         "event_date": event_date,
@@ -427,10 +428,40 @@ def recovery_vs_controls(zip_code: str, event_date: str, event_name: str | None 
         "chart": {"zip": zip_code, "event_date": event_date, "event_name": event_name, "baseline_value": round(base),
                   "control_scope": control_scope, "controls": [c["zip"] for c in controls], "months": chart},
         "method": recovery_vs_controls.__doc__.split("\n\n", 1)[1].strip(),
+        "warnings": warnings,
         "caveats": ["This shows correlation, not causation: the controls rule out market-wide moves, not everything.",
                     "ZHVI is smoothed: short dips are spread out and look smaller."],
-        "source": _source(["zips", "zhvi", "nfip_claims"], sql1, sql2),
+        "source": _source(["zips", "zhvi", "nfip_claims"], sql1, sql2, sql3),
     }
+
+
+def _recovery_warnings(zip_code: str, event: date, event_name: str | None, control_scope: str,
+                       path: list[dict], low: dict) -> tuple[list[str], str]:
+    """What else could explain the gap: later floods in the window, the 2007-2011 housing crash,
+    controls from other metros, and a gap still widening at the end of the data."""
+    warnings = []
+    # Later floods in the same ZIP, inside the window: their effect mixes with this event's.
+    later, sql_text = _query("""
+        SELECT coalesce(flood_event, 'unnamed flooding') AS event, min(date_of_loss) AS first_loss, count(*) AS claims
+        FROM nfip_claims
+        WHERE zip = $zip AND date_of_loss > $after AND date_of_loss <= $to
+          AND ($name IS NULL OR flood_event IS NULL OR flood_event NOT ILIKE '%' || $name || '%')
+        GROUP BY 1 HAVING count(*) >= 25 ORDER BY first_loss
+    """, {"zip": zip_code, "name": event_name, "after": (event + timedelta(days=90)).isoformat(), "to": path[-1]["month"]})
+    for e in later:
+        warnings.append(f"Another flood hit this ZIP inside the window: {e['event']} ({e['first_loss']}, "
+                        f"{e['claims']:,} claims). Its effect is mixed into this comparison.")
+    if event < date(2008, 1, 1) and path[-1]["month"] >= "2007-01-01":
+        crash_low = "2007-01-01" <= low["month"] <= "2012-12-31"
+        warnings.append("The window includes the 2007-2011 housing crash" + (
+            ", and the low point falls inside it: the crash hit some markets harder than others, so the gap "
+            "may reflect the crash more than the event." if crash_low else "."))
+    if control_scope.startswith("same state"):
+        warnings.append("The controls come from other metros in the state, so the gap also reflects how "
+                        "those metro markets moved, not only the event. Treat its size as rough.")
+    if low["month"] == path[-1]["month"] and len(path) > 1:
+        warnings.append("The gap was still widening in the latest month of data: the low point may not be reached yet.")
+    return warnings, sql_text
 
 
 # --- For the page's map, not the model ---

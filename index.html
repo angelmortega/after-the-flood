@@ -109,20 +109,46 @@
                 letter-spacing: 0;
             }
             .examples {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 0.5rem;
-                margin-top: 0.75rem;
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+                gap: 0.6rem;
+                margin-top: 0.9rem;
             }
             .examples button {
+                display: flex;
+                flex-direction: column;
+                gap: 0.3rem;
+                background: var(--card);
+                color: var(--ink);
+                border: 1px solid var(--line);
+                border-radius: 10px;
+                padding: 0.7rem 0.8rem;
+                text-align: left;
+                font-weight: 400;
+                font-size: 0.85rem;
+                line-height: 1.35;
+                transition: border-color 0.15s, box-shadow 0.15s;
+            }
+            .examples button:hover {
+                border-color: var(--accent);
+                box-shadow: 0 2px 8px rgba(21, 101, 192, 0.12);
+            }
+            .examples .tag {
+                align-self: flex-start;
+                font-size: 0.7rem;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+                padding: 0.1rem 0.45rem;
+                border-radius: 999px;
                 background: var(--accent-soft);
                 color: var(--accent);
-                font-weight: 500;
-                font-size: 0.85rem;
-                padding: 0.35rem 0.75rem;
-                border-radius: 999px;
-                text-align: left;
             }
+            .examples .tag.down { background: #fbe9e7; color: var(--zip); }
+            .examples .tag.up { background: #e8f5e9; color: var(--market); }
+            .examples .tag.compare { background: #f3e5f5; color: var(--hazard); }
+            .examples .title { font-weight: 600; font-size: 0.92rem; }
+            .examples .sub { color: var(--muted); font-size: 0.8rem; }
             #clarify ul {
                 margin: 0 0 1rem 1.2rem;
                 padding: 0;
@@ -321,9 +347,36 @@
                     <button id="run" type="submit">Research</button>
                 </form>
                 <div class="examples" id="examples">
-                    <button type="button">How did Hurricane Sandy affect home values in Rockaway, Queens (11691, 11692, 11694)?</button>
-                    <button type="button">Which ZIP codes in Harris County, TX have flooded the most since 2000?</button>
-                    <button type="button">Is Fort Myers Beach safe to buy in?</button>
+                    <button type="button" data-q="How did Hurricane Sandy affect home values in Long Beach, NY (11561)?">
+                        <span class="tag down">Didn't recover</span>
+                        <span class="title">Long Beach, NY after Sandy</span>
+                        <span class="sub">Fell behind similar ZIPs and was still behind five years later.</span>
+                    </button>
+                    <button type="button" data-q="How did Hurricane Harvey affect home values in Port Aransas, TX (78373)?">
+                        <span class="tag up">Recovered</span>
+                        <span class="title">Port Aransas, TX after Harvey</span>
+                        <span class="sub">Dropped after the storm, then caught up with similar ZIPs.</span>
+                    </button>
+                    <button type="button" data-q="Compare home values in Long Beach, NY (11561) after Hurricane Sandy with Port Aransas, TX (78373) after Hurricane Harvey. Why did one recover and not the other?">
+                        <span class="tag compare">Compare</span>
+                        <span class="title">Long Beach vs. Port Aransas</span>
+                        <span class="sub">One beach town recovered, the other didn't. What does the data show?</span>
+                    </button>
+                    <button type="button" data-q="Is Fort Myers Beach safe to buy in after Hurricane Ian?">
+                        <span class="tag down">Buying?</span>
+                        <span class="title">Fort Myers Beach, FL after Ian</span>
+                        <span class="sub">One of the biggest gaps in the data, with Helene and Milton after.</span>
+                    </button>
+                    <button type="button" data-q="Which ZIP codes in Harris County, TX have flooded the most since 2000?">
+                        <span class="tag">Repeat flooding</span>
+                        <span class="title">Harris County, TX since 2000</span>
+                        <span class="sub">Which Houston-area ZIPs flood again and again.</span>
+                    </button>
+                    <button type="button" data-q="How did Hurricane Sandy affect home values in Rockaway, Queens (11691, 11692, 11694)?">
+                        <span class="tag down">Didn't recover</span>
+                        <span class="title">Rockaway, Queens after Sandy</span>
+                        <span class="sub">Thousands of claims, and values that lagged nearby ZIPs.</span>
+                    </button>
                 </div>
             </section>
 
@@ -438,8 +491,9 @@
             // --- Asking ---
 
             $("examples").addEventListener("click", (e) => {
-                if (e.target.tagName !== "BUTTON") return;
-                $("question").value = e.target.textContent;
+                const b = e.target.closest("button");
+                if (!b) return;
+                $("question").value = b.dataset.q;
                 start("");
             });
             $("task").addEventListener("submit", (e) => {
