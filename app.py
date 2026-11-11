@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import re
 import uuid
 from dataclasses import dataclass, field
@@ -40,6 +41,8 @@ class Research:
     researchers: int = 0  # how many researchers have started, to number them
     findings: list[str] = field(default_factory=list)  # what each researcher reported, for the Writer
     sources: dict[str, dict] = field(default_factory=dict)  # "S1" -> the tool call, tables and SQL behind it
+    charts: list[dict] = field(default_factory=list)  # recovery curves, for the page
+    map: dict | None = None  # ZIPs around the place with their claims, for the page
 
 
 def _answer(ctx: RunContextWrapper[Research], name: str, args: dict, fn, **kwargs) -> str:
@@ -52,9 +55,16 @@ def _answer(ctx: RunContextWrapper[Research], name: str, args: dict, fn, **kwarg
         return json.dumps({"error": f"{name} failed: {type(e).__name__}: {e}"})
     if "error" in result:
         return json.dumps(result, default=str)
-    source_id = f"S{len(ctx.context.sources) + 1}"
+    # The same call twice (e.g. a second researcher round) keeps its first source id and chart.
+    repeat = next((sid for sid, s in ctx.context.sources.items() if s["tool"] == name and s["args"] == args), None)
+    source_id = repeat or f"S{len(ctx.context.sources) + 1}"
     ctx.context.sources[source_id] = {"tool": name, "args": args, **result.get("source", {})}
-    body = {k: v for k, v in result.items() if k != "source"}
+    if "chart" in result and not repeat:
+        # The recovery curve goes straight to the page; the model gets the yearly summary.
+        chart = {**result["chart"], "source_id": source_id}
+        ctx.context.charts.append(chart)
+        ctx.context.hooks.emit({"type": "chart", **chart})
+    body = {k: v for k, v in result.items() if k not in ("source", "chart")}
     return json.dumps({"source_id": source_id, **body}, default=str)
 
 
@@ -70,7 +80,29 @@ def resolve_place(ctx: RunContextWrapper[Research], place: str, state: str | Non
             Neighborhoods are not in the data: pass their ZIP codes instead.
         state: Two-letter state code, to tell apart places with the same name. Optional.
     """
-    return _answer(ctx, "resolve_place", {"place": place, "state": state}, tools.resolve_place, place=place, state=state)
+    answer = _answer(ctx, "resolve_place", {"place": place, "state": state}, tools.resolve_place, place=place, state=state)
+    _send_map(ctx.context, json.loads(answer))
+    return answer
+
+
+def _send_map(run: "Research", place: dict) -> None:
+    """Draw the place on the page's map as soon as it's resolved: every ZIP in its counties,
+    sized by NFIP claims, with the place's own ZIPs highlighted."""
+    if "error" in place or not place.get("counties"):
+        return
+    try:
+        counties = [c["county_fips"] for c in place["counties"]][:3]
+        data = tools.claims_map(counties, place["zips"])
+    except Exception:
+        return  # the map is a nicety: never fail the research over it
+    # A comparison resolves several places: keep the ones already drawn.
+    zips = {z["zip"]: z for z in (run.map or {}).get("zips", [])}
+    for z in data["zips"]:
+        z["highlight"] = z["highlight"] or zips.get(z["zip"], {}).get("highlight", False)
+        zips[z["zip"]] = z
+    counties = {c["county_fips"]: c for c in (run.map or {}).get("counties", []) + place["counties"]}
+    run.map = {"zips": list(zips.values()), "counties": list(counties.values())}
+    run.hooks.emit({"type": "map", **run.map})
 
 
 @function_tool
@@ -208,7 +240,8 @@ biggest ones, and the matching federal declarations.""" + RESEARCHER_RULES,
         instructions="""\
 You research what floods cost in a place, from NFIP flood insurance claims. You get a task with the
 ZIP codes and/or county FIPS code and dates. Report claim counts and payouts by event, how often the
-place floods again (repeat_flooding), and the flood-zone mix. Remember that few claims can mean few
+place floods again (repeat_flooding), and the flood-zone mix. When the task compares places, call
+repeat_flooding once per place, never on their ZIPs combined. Remember that few claims can mean few
 policies, not little flooding.""" + RESEARCHER_RULES,
         model=RESEARCHER_MODEL, model_settings=SETTINGS,
         tools=[claims_summary, repeat_flooding, sql, describe_tables],
@@ -217,11 +250,13 @@ policies, not little flooding.""" + RESEARCHER_RULES,
         name="Market Researcher",
         instructions="""\
 You research what happened to home values after an event, from the Zillow Home Value Index. You get
-a task with the ZIP code(s) and the event name and date. For each ZIP (at most 3), call
-recovery_vs_controls; call price_path when you need the plain before/after values. Report the
-baseline value, the low point, whether and when the ZIP caught up with its control ZIPs, and which
-controls were used (control_scope). Never say the event caused the change: say how the ZIP moved
-compared with its controls.""" + RESEARCHER_RULES,
+a task with the ZIP code(s) and the event name and date (a comparison can give each ZIP its own
+event). For each ZIP (at most 3), call recovery_vs_controls; call price_path when you need the plain
+before/after values. Report the baseline value, the low point, whether and when the ZIP caught up
+with its control ZIPs, and which controls were used (control_scope). Report every item in warnings
+(later floods in the window, the housing crash, controls from other metros, a gap still widening):
+they decide how far the gap can be trusted. Never say the event caused the change: say how the ZIP
+moved compared with its controls.""" + RESEARCHER_RULES,
         model=RESEARCHER_MODEL, model_settings=SETTINGS,
         tools=[recovery_vs_controls, price_path, sql, describe_tables],
     ),
@@ -263,11 +298,14 @@ journalists and planning students. The data covers NY, WA, CA, TX, MA, IL and FL
    "CLARIFY:" followed by 1 to 3 short questions, one per line (which place, which period or event,
    buying or renting), and nothing else. Otherwise don't ask: work with what you have.
 2. Call resolve_place. For a neighborhood, pass its ZIP codes. Then call claims_summary on its ZIPs
-   (or county) grouped by event, to find the floods that mattered and their peak dates.
+   (or county) grouped by event, to find the floods that mattered and their peak dates. If the
+   question compares places, do this for each place (in the same turn), and keep both places in
+   every researcher task below, each with its own event.
 3. Call research three times in the same turn, one per researcher (hazard, insurance, market), so
    they work in parallel. Give each a self-contained task: the ZIP codes, county FIPS code(s), the
    events with their dates (YYYY-MM-DD), and what to find out. For market, pick at most 3 ZIPs that
-   have home values, and the most important event (or the one the user asked about).
+   have home values, and the most important event (or the one the user asked about). Use the peak
+   loss date from claims_summary as the event date.
 4. Read the findings. If there's a gap (e.g. NOAA shows a big event but there are no claims, or a
    ZIP has no home values), call research again for just that part. One extra round at most.
 5. Reply DONE and nothing else: a writer writes the report.""",
@@ -286,18 +324,26 @@ Write a report in markdown that answers the question, using only the findings yo
 Sections, in this order:
 1. **Verdict**: one or two sentences, e.g. "Repeat flood zone; home values fell behind similar ZIPs
    after Sandy and had not caught up five years later", and a confidence level (high, medium, low)
-   with the reason.
+   with the reason. Lower the confidence when the home value findings carry warnings (another flood
+   in the window, the housing crash, controls from other metros), and say which one.
 2. **What happened**: a timeline of the main events (NOAA, FEMA).
 3. **What it cost**: the insurance picture: claims, payouts, how often the place floods again.
-4. **What came after**: home values compared with the control ZIPs, and how the controls were chosen.
+4. **What came after**: home values compared with the control ZIPs, how the controls were chosen,
+   and what else could explain the gap (the warnings in the findings). For a comparison, a short
+   table with one row per place.
 5. **What the data can't tell you**: the caveats that matter for this place, including: NFIP data
    can't say whether a specific house flooded; it only covers insured homes; these are records of
    the past, not forecasts; and the home value comparison is correlation, not causation.
 
 Rules:
 - End every sentence that states a number with the source id(s) of its finding, e.g. [S4].
-- Use only numbers that appear in the findings. Never compute new totals or percentages.
+- Use only numbers that appear in the findings. Never compute new totals, counts or percentages,
+  e.g. don't turn "44.2% primary residences" and "2,611 claims" into a count of homes.
+- Write for a home buyer, not a programmer: never mention field names, "null", or tool names.
 - Never say the flood caused a price change: say how the ZIP's values moved compared with similar ZIPs.
+- If the question asks why, say the data can't show why, then list the differences it does show
+  (e.g. share of primary residences, how often each place floods, the warnings) as differences, not
+  explanations: no "because", "may relate to" or "may have recovered faster since".
 - Write plain, specific sentences. No "profoundly", "pivotal", "it is worth noting".""",
     model=MODEL,
     model_settings=SETTINGS,
@@ -338,7 +384,8 @@ async def deep_research(question: str, clarification: str, hooks: PanelHooks) ->
     asked = question + (f"\n(Clarified: {clarification})" if clarification else "")
     report = await Runner.run(writer, f"Question: {asked}\n\nFindings:\n\n{findings}", hooks=hooks)
     markdown = str(report.final_output)
-    return {"type": "done", "markdown": markdown + source_list(markdown, research_run.sources)}
+    return {"type": "done", "markdown": markdown + source_list(markdown, research_run.sources),
+            "charts": research_run.charts, "map": research_run.map}
 
 
 # --- FastAPI App ---
@@ -389,5 +436,20 @@ async def run(question: str, clarification: str = ""):
     return StreamingResponse(events(), media_type="text/event-stream")
 
 
+def billed_project() -> str:
+    """The project Vertex AI bills, resolved the way LiteLLM does: VERTEXAI_PROJECT first, then
+    Google's default credentials (GOOGLE_CLOUD_PROJECT, then `gcloud config`)."""
+    if os.environ.get("VERTEXAI_PROJECT"):
+        return f"{os.environ['VERTEXAI_PROJECT']} (from VERTEXAI_PROJECT)"
+    try:
+        import google.auth
+
+        _, project = google.auth.default()
+        return f"{project} (from gcloud defaults: set VERTEXAI_PROJECT in .env to pin it)"
+    except Exception as e:
+        return f"unknown ({type(e).__name__}: run gcloud auth application-default login)"
+
+
 if __name__ == "__main__":
+    print(f"Vertex AI bills project: {billed_project()}")
     uvicorn.run(app, host="127.0.0.1", port=8000)

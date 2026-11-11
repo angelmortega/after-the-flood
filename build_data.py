@@ -14,6 +14,7 @@ Tables written (all filtered to STATES):
     zhvi.parquet              (zip, month, value): Zillow typical home value, long format
     zips.parquet              one row per ZIP: city, metro, county, primary county FIPS
     zip_county.parquet        Census ZCTA -> county overlap, with each county's share of land area
+    zip_centroids.parquet     each ZIP's internal point (lat, lon), for the map
     manifest.json             row counts, source URLs and build date, for citations
 """
 
@@ -21,6 +22,7 @@ import json
 import re
 import sys
 import time
+import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
@@ -43,6 +45,7 @@ NOAA_DIR = "https://www.ncei.noaa.gov/pub/data/swdi/stormevents/csvfiles/"
 ZHVI_URL = "https://files.zillowstatic.com/research/public_csvs/zhvi/Zip_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv"
 ZCTA_COUNTY_URL = "https://www2.census.gov/geo/docs/maps-data/data/rel2020/zcta520/tab20_zcta520_county20_natl.txt"
 NWS_ZONES_PAGE = "https://www.weather.gov/gis/ZoneCounty"
+GAZETTEER_URL = "https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2020_Gazetteer/2020_Gaz_zcta_national.zip"
 
 NFIP_COLUMNS = [
     "id", "dateOfLoss", "yearOfLoss", "state", "countyCode", "reportedZipCode", "censusGeoid",
@@ -357,6 +360,20 @@ def build_zhvi() -> None:
         FROM wide w LEFT JOIN primary_county p ON p.zip = lpad(w.RegionName, 5, '0')
         ORDER BY zip
     """, "zips", ZHVI_URL + " + " + ZCTA_COUNTY_URL)
+
+    # Where each ZIP is, for the map: the Census's internal point of each ZCTA.
+    gazetteer = download(GAZETTEER_URL, RAW / "zcta_gazetteer.zip")
+    with zipfile.ZipFile(gazetteer) as z:
+        txt = RAW / z.namelist()[0]
+        if not txt.exists():
+            z.extract(z.namelist()[0], RAW)
+    write(c, f"""
+        SELECT trim(GEOID) AS zip, CAST(trim(INTPTLAT) AS DOUBLE) AS lat, CAST(trim(INTPTLONG) AS DOUBLE) AS lon,
+               CAST(ALAND_SQMI AS DOUBLE) AS land_sq_mi
+        FROM read_csv('{txt}', delim='\\t', header=true, all_varchar=true)
+        WHERE trim(GEOID) IN (SELECT zip FROM '{DATA / "zip_county.parquet"}')
+        ORDER BY zip
+    """, "zip_centroids", GAZETTEER_URL)
 
 
 STEPS = {"nfip": build_nfip, "declarations": build_declarations, "noaa": build_noaa, "zhvi": build_zhvi}

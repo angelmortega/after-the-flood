@@ -23,6 +23,7 @@ TABLES = {
     "zhvi": "Zillow Home Value Index (ZHVI), typical home value by ZIP and month",
     "zips": "ZIP metadata: city, metro, county (Zillow + Census)",
     "zip_county": "Census ZCTA -> county overlap",
+    "zip_centroids": "Census ZCTA internal points (Gazetteer)",
 }
 # NOAA event types that are floods, or storms that bring floods.
 FLOOD_EVENT_TYPES = [
@@ -378,7 +379,8 @@ def recovery_vs_controls(zip_code: str, event_date: str, event_name: str | None 
         return {"error": f"Only {len(controls)} control ZIPs found for {zip_code}: too few to compare.",
                 "controls": controls, "source": _source(["zips", "zhvi", "nfip_claims"], sql1)}
 
-    params2 = {"zips": [zip_code] + [c["zip"] for c in controls], "from": params["from"],
+    # From a year before the event, so the chart shows the trend going in.
+    params2 = {"zips": [zip_code] + [c["zip"] for c in controls], "from": (event - timedelta(days=366)).isoformat(),
                "to": (event + timedelta(days=31 * months_after)).isoformat()}
     series, sql2 = _query("""
         SELECT zip, month, value FROM zhvi
@@ -389,16 +391,15 @@ def recovery_vs_controls(zip_code: str, event_date: str, event_name: str | None 
     for r in series:
         by_month.setdefault(r["month"], {})[r["zip"]] = r["value"] / baselines[r["zip"]]
 
-    path = []
+    chart = []  # every month, before and after the event
     for month, idx in sorted(by_month.items()):
-        if month < event_date or zip_code not in idx:
-            continue
         ctrl = [v for z, v in idx.items() if z != zip_code]
-        if not ctrl:
+        if zip_code not in idx or not ctrl:
             continue
         ctrl_median = statistics.median(ctrl)
-        path.append({"month": month, "zip_index": round(idx[zip_code], 3),
-                     "controls_index": round(ctrl_median, 3), "relative": round(idx[zip_code] / ctrl_median, 3)})
+        chart.append({"month": month, "zip_index": round(idx[zip_code], 3),
+                      "controls_index": round(ctrl_median, 3), "relative": round(idx[zip_code] / ctrl_median, 3)})
+    path = [p for p in chart if p["month"] >= event_date]
     if not path:
         return {"error": "No home values after the event.", "source": _source(["zhvi"], sql1, sql2)}
 
@@ -412,6 +413,7 @@ def recovery_vs_controls(zip_code: str, event_date: str, event_name: str | None 
     else:
         verdict = (f"Fell {round(100 * (1 - low['relative']), 1)}% behind the controls and had not caught up "
                    f"{months_to(path[-1])} months later ({round(100 * (path[-1]['relative'] - 1), 1)}% at the end).")
+    warnings, sql3 = _recovery_warnings(zip_code, event, event_name, control_scope, path, low)
     return {
         "zip": zip_code,
         "event_date": event_date,
@@ -422,11 +424,67 @@ def recovery_vs_controls(zip_code: str, event_date: str, event_name: str | None 
         "recovered": {**recovered, "months_after_event": months_to(recovered)} if recovered else None,
         "verdict": verdict,
         "path_yearly": [p for i, p in enumerate(path) if i % 12 == 0] + ([path[-1]] if (len(path) - 1) % 12 else []),
+        # For the page's chart, not the model: app.py takes it out of what the model sees.
+        "chart": {"zip": zip_code, "event_date": event_date, "event_name": event_name, "baseline_value": round(base),
+                  "control_scope": control_scope, "controls": [c["zip"] for c in controls], "months": chart},
         "method": recovery_vs_controls.__doc__.split("\n\n", 1)[1].strip(),
+        "warnings": warnings,
         "caveats": ["This shows correlation, not causation: the controls rule out market-wide moves, not everything.",
                     "ZHVI is smoothed: short dips are spread out and look smaller."],
-        "source": _source(["zips", "zhvi", "nfip_claims"], sql1, sql2),
+        "source": _source(["zips", "zhvi", "nfip_claims"], sql1, sql2, sql3),
     }
+
+
+def _recovery_warnings(zip_code: str, event: date, event_name: str | None, control_scope: str,
+                       path: list[dict], low: dict) -> tuple[list[str], str]:
+    """What else could explain the gap: later floods in the window, the 2007-2011 housing crash,
+    controls from other metros, and a gap still widening at the end of the data."""
+    warnings = []
+    # Later floods in the same ZIP, inside the window: their effect mixes with this event's.
+    later, sql_text = _query("""
+        SELECT coalesce(flood_event, 'unnamed flooding') AS event, min(date_of_loss) AS first_loss, count(*) AS claims
+        FROM nfip_claims
+        WHERE zip = $zip AND date_of_loss > $after AND date_of_loss <= $to
+          AND ($name IS NULL OR flood_event IS NULL OR flood_event NOT ILIKE '%' || $name || '%')
+        GROUP BY 1 HAVING count(*) >= 25 ORDER BY first_loss
+    """, {"zip": zip_code, "name": event_name, "after": (event + timedelta(days=90)).isoformat(), "to": path[-1]["month"]})
+    for e in later:
+        warnings.append(f"Another flood hit this ZIP inside the window: {e['event']} ({e['first_loss']}, "
+                        f"{e['claims']:,} claims). Its effect is mixed into this comparison.")
+    if event < date(2008, 1, 1) and path[-1]["month"] >= "2007-01-01":
+        crash_low = "2007-01-01" <= low["month"] <= "2012-12-31"
+        warnings.append("The window includes the 2007-2011 housing crash" + (
+            ", and the low point falls inside it: the crash hit some markets harder than others, so the gap "
+            "may reflect the crash more than the event." if crash_low else "."))
+    if control_scope.startswith("same state"):
+        warnings.append("The controls come from other metros in the state, so the gap also reflects how "
+                        "those metro markets moved, not only the event. Treat its size as rough.")
+    if low["month"] == path[-1]["month"] and len(path) > 1:
+        warnings.append("The gap was still widening in the latest month of data: the low point may not be reached yet.")
+    return warnings, sql_text
+
+
+# --- For the page's map, not the model ---
+
+
+def claims_map(county_fips: list[str], highlight: list[str] | None = None) -> dict:
+    """Every ZIP in these counties with its location and NFIP claims since 1978, for the map."""
+    rows, sql_text = _query("""
+        WITH area AS (SELECT DISTINCT zip FROM zip_county WHERE county_fips IN (SELECT unnest($counties))),
+        claims AS (
+            SELECT zip, count(*) AS claims, sum(paid_total) AS paid_usd,
+                   count(*) FILTER (WHERE year_of_loss >= 2000) AS claims_since_2000
+            FROM nfip_claims WHERE zip IN (SELECT zip FROM area) GROUP BY zip
+        )
+        SELECT a.zip, z.city, g.lat, g.lon, coalesce(c.claims, 0) AS claims, coalesce(c.paid_usd, 0) AS paid_usd,
+               coalesce(c.claims_since_2000, 0) AS claims_since_2000
+        FROM area a JOIN zip_centroids g USING (zip) LEFT JOIN zips z USING (zip) LEFT JOIN claims c USING (zip)
+        ORDER BY claims DESC
+    """, {"counties": county_fips})
+    highlight = set(highlight or [])
+    for r in rows:
+        r["highlight"] = r["zip"] in highlight
+    return {"zips": rows, "source": _source(["zip_county", "zip_centroids", "nfip_claims", "zips"], sql_text)}
 
 
 # --- Escape hatch: read-only SQL ---
