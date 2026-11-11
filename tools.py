@@ -499,6 +499,137 @@ def _recovery_warnings(zip_code: str, event: date, event_name: str | None, contr
     return warnings, sql_text
 
 
+# --- Market researcher, place questions: compare the ZIPs of a place over recent years ---
+
+SHOW_ALL_UP_TO = 8  # a place with more ZIPs than this shows its most-flooded few
+SHOW_TOP = 5
+
+
+def data_through() -> str:
+    """The latest month with home values: what "now" means for every recent window."""
+    rows, _ = _query("SELECT max(month) AS m FROM zhvi")
+    return rows[0]["m"]
+
+
+def _years_before(month: str, years: int) -> str:
+    """'2026-09-30', 2 -> '2024-09'."""
+    return f"{int(month[:4]) - years:04d}{month[4:7]}"
+
+
+def compare_zips(zips: list[str] | str, years: int = 2) -> dict:
+    """Compare the ZIPs of a place over the last `years` years: flood claims recently and since
+    2000, today's typical home value, and how it moved compared with the metro area's median ZIP.
+
+    A place with more than SHOW_ALL_UP_TO ZIPs shows the SHOW_TOP with the most recent claims
+    (then most claims since 2000), plus the ones with the fewest claims since 2000."""
+    zips = _zips(zips)
+    if not zips:
+        return {"error": "Pass at least one 5-digit ZIP code."}
+    years = max(1, min(int(years), 10))
+    end = data_through()
+    start = _years_before(end, years)
+    params = {"zips": zips, "start": start + "-01", "end": end}
+
+    claims, sql1 = _query("""
+        SELECT z.zip, any_value(m.city) AS city, any_value(m.county_name) AS county, any_value(m.metro) AS metro,
+               count(c.id) FILTER (WHERE c.date_of_loss >= $start) AS claims_recent,
+               coalesce(sum(c.paid_total) FILTER (WHERE c.date_of_loss >= $start), 0) AS paid_recent_usd,
+               string_agg(DISTINCT coalesce(c.flood_event, 'unnamed flooding'), '; ')
+                   FILTER (WHERE c.date_of_loss >= $start) AS recent_events,
+               count(c.id) FILTER (WHERE c.year_of_loss >= 2000) AS claims_since_2000,
+               count(DISTINCT c.year_of_loss) FILTER (WHERE c.year_of_loss >= 2000) AS years_with_claims_since_2000
+        FROM (SELECT unnest($zips) AS zip) z
+        LEFT JOIN nfip_claims c USING (zip)
+        LEFT JOIN zips m USING (zip)
+        GROUP BY z.zip
+    """, params)
+
+    # Home values from a year before the window, so the chart shows the trend going in.
+    chart_from = _years_before(end, years + 1) + "-01"
+    series, sql2 = _query("""
+        SELECT zip, strftime(month, '%Y-%m') AS month, value FROM zhvi
+        WHERE zip IN (SELECT unnest($zips)) AND month >= $chart_from ORDER BY month
+    """, {**params, "chart_from": chart_from})
+    by_zip: dict[str, dict[str, float]] = {}
+    for r in series:
+        by_zip.setdefault(r["zip"], {})[r["month"]] = r["value"]
+    end_m, start_m, year_m = end[:7], start, _years_before(end, 1)
+
+    def change(values: dict, frm: str):
+        a, b = values.get(frm), values.get(end_m)
+        return round(100 * (b / a - 1), 1) if a and b else None
+
+    # The metro's median ZIP over the same window: separates the local market from the ZIP.
+    metros = sorted({r["metro"] for r in claims if r["metro"]})
+    metro_rows, sql3 = _query("""
+        WITH a AS (SELECT zip, value FROM zhvi WHERE strftime(month, '%Y-%m') = $start_m),
+             b AS (SELECT zip, value FROM zhvi WHERE strftime(month, '%Y-%m') = $end_m)
+        SELECT z.metro, round(100 * (median(b.value / a.value) - 1), 1) AS change_pct, count(*) AS zips
+        FROM zips z JOIN a USING (zip) JOIN b USING (zip)
+        WHERE z.metro IN (SELECT unnest($metros)) GROUP BY 1
+    """, {"start_m": start_m, "end_m": end_m, "metros": metros or [""]})
+    metro_change = {r["metro"]: r["change_pct"] for r in metro_rows}
+
+    rows = []
+    for r in claims:
+        values = by_zip.get(r["zip"], {})
+        chg = change(values, start_m)
+        m = metro_change.get(r["metro"])
+        rows.append({
+            "zip": r["zip"], "area": ", ".join(x for x in (r["city"], r["county"]) if x) or "?",
+            "claims_recent": r["claims_recent"], "paid_recent_usd": r["paid_recent_usd"],
+            "recent_events": r["recent_events"],
+            "claims_since_2000": r["claims_since_2000"],
+            "years_with_claims_since_2000": r["years_with_claims_since_2000"],
+            "home_value_now": round(values[end_m]) if end_m in values else None,
+            "change_1y_pct": change(values, year_m),
+            "change_window_pct": chg,
+            "metro_change_window_pct": m,
+            "vs_metro_points": round(chg - m, 1) if chg is not None and m is not None else None,
+        })
+    rows.sort(key=lambda r: (-r["claims_recent"], -r["claims_since_2000"], r["zip"]))
+    shown, note, least = rows, None, None
+    if len(rows) > SHOW_ALL_UP_TO:
+        shown = rows[:SHOW_TOP]
+        least = sorted((r for r in rows if r["home_value_now"]), key=lambda r: (r["claims_since_2000"], r["zip"]))[:3]
+        least = [{k: r[k] for k in ("zip", "area", "claims_recent", "claims_since_2000", "home_value_now", "vs_metro_points")}
+                 for r in least]
+        note = (f"This place has {len(rows)} ZIP codes: showing the {SHOW_TOP} with the most flood claims in the "
+                f"last {years} years. Ask about a neighborhood or a few ZIP codes for a closer look.")
+
+    # The chart: each shown ZIP and the metro median, 100 = the start of the window.
+    main_metro = max(metros, key=lambda m: sum(r["metro"] == m for r in claims)) if metros else None
+    metro_series, sql4 = _query("""
+        WITH a AS (SELECT zip, value FROM zhvi WHERE strftime(month, '%Y-%m') = $start_m)
+        SELECT strftime(v.month, '%Y-%m') AS month, 10000 * median(v.value / a.value) AS idx_x10000
+        FROM zhvi v JOIN a USING (zip) JOIN zips z USING (zip)
+        WHERE z.metro = $metro AND v.month >= $chart_from GROUP BY 1 ORDER BY 1
+    """, {"start_m": start_m, "metro": main_metro, "chart_from": chart_from})
+    lines = [{"zip": r["zip"], "area": r["area"],
+              "points": {m: round(100 * v / by_zip[r["zip"]][start_m], 1) for m, v in by_zip[r["zip"]].items()}}
+             for r in shown if start_m in by_zip.get(r["zip"], {})]
+    return {
+        "data_through": end,
+        "window": f"{start} to {end_m} ({years} years)",
+        "zips_in_place": len(rows),
+        "zips": shown,
+        "least_flooded": least,
+        "note": note,
+        "metro_median_change_window_pct": metro_change,
+        "chart": {"kind": "prices", "window_start": start_m, "metro": main_metro,
+                  # _clean rounds floats, so the index comes back scaled up to keep one decimal.
+                  "metro_points": {r["month"]: round(r["idx_x10000"] / 100, 1) for r in metro_series},
+                  "lines": lines},
+        "caveats": [
+            "Few claims can mean few flood insurance policies, not little flooding.",
+            "Home value changes compare each ZIP with the median ZIP of its metro area over the same window: "
+            "they describe the past, not where prices will go.",
+            "NOAA storm events are recorded by county or forecast zone, not by ZIP.",
+        ],
+        "source": _source(["nfip_claims", "zhvi", "zips"], sql1, sql2, sql3, sql4),
+    }
+
+
 # --- For the page's map, not the model ---
 
 
@@ -557,7 +688,7 @@ if __name__ == "__main__":
         text = json.dumps({k: v for k, v in result.items() if k not in ("source", "series")}, indent=1, default=str)
         print(text[:2500] + ("\n..." if len(text) > 2500 else ""))
 
-    which = sys.argv[1:] or ["rockaway", "harris", "fortmyers"]
+    which = sys.argv[1:] or ["rockaway", "harris", "fortmyers", "palmbay"]
     if "rockaway" in which:
         show("resolve 11691 11692 11694", resolve_place("11691 11692 11693 11694"))
         show("Sandy claims, Rockaway", claims_summary(["11691", "11692", "11693", "11694"], start="2012-10-01", end="2012-12-31"))
@@ -573,3 +704,5 @@ if __name__ == "__main__":
         show("Ian claims 33931", claims_summary(["33931"], start="2022-09-01", end="2022-12-31"))
         show("Price path 33931 after Ian", price_path("33931", "2022-09-28"))
         show("Recovery 33931 after Ian", recovery_vs_controls("33931", "2022-09-28", "Ian"))
+    if "palmbay" in which:
+        show("Compare Palm Bay ZIPs, last 2 years", compare_zips(resolve_place("Palm Bay", "FL")["zips"]))

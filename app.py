@@ -196,6 +196,20 @@ def recovery_vs_controls(ctx: RunContextWrapper[Research], zip_code: str, event_
 
 
 @function_tool
+def compare_zips(ctx: RunContextWrapper[Research], zips: list[str], years: int = 2) -> str:
+    """Compare a place's ZIP codes over the last few years: flood claims recently and since 2000,
+    today's home value, and how it moved compared with the metro area's median ZIP. Pass every ZIP
+    of the place: a big place shows its 5 most-flooded ZIPs and the 3 least-flooded.
+
+    Args:
+        zips: 5-digit ZIP codes of the place.
+        years: How many years back the recent window goes. 2 unless the user asked for another period.
+    """
+    args = {"zips": zips, "years": years}
+    return _answer(ctx, "compare_zips", args, tools.compare_zips, **args)
+
+
+@function_tool
 def sql(ctx: RunContextWrapper[Research], query: str) -> str:
     """Run one read-only SQL SELECT (DuckDB dialect) over the tables, when no other tool answers.
     At most 50 rows come back. Call describe_tables first for the columns.
@@ -232,7 +246,9 @@ researcher_agents = {
 You research what happened in a place: storms and floods from NOAA's Storm Events Database, and
 federal disaster declarations from FEMA. You get a task with the county FIPS code(s) and dates.
 Report the events, their dates, deaths, damage, and a short quote from NOAA's narrative for the
-biggest ones, and the matching federal declarations.""" + RESEARCHER_RULES,
+biggest ones, and the matching federal declarations. When the task asks about recent weather in
+general (not one flood), call storm_events with flood_only=false and the task's start date, and
+report the counts by event type and the 3 to 5 most damaging episodes, newest first.""" + RESEARCHER_RULES,
         model=RESEARCHER_MODEL, model_settings=SETTINGS,
         tools=[storm_events, declarations, sql, describe_tables],
     ),
@@ -250,9 +266,15 @@ policies, not little flooding.""" + RESEARCHER_RULES,
     "market": Agent(
         name="Market Researcher",
         instructions="""\
-You research what happened to home values after an event, from the Zillow Home Value Index. You get
-a task with the ZIP code(s) and the event name and date (a comparison can give each ZIP its own
-event). For each ZIP (at most 3), call recovery_vs_controls; call price_path when you need the plain
+You research home values from the Zillow Home Value Index. There are two kinds of task.
+
+A task that compares the ZIPs of a place over recent years: call compare_zips once, with every ZIP
+in the task and the number of years. Report one bullet per ZIP: its area, claims in the window and
+since 2000, today's value, its change over the window, and the metro median's change (vs_metro_points).
+Then a bullet with least_flooded and the note, if given. Don't call recovery_vs_controls.
+
+A task about an event: you get the ZIP code(s) and the event name and date (a comparison can give
+each ZIP its own event). For each ZIP (at most 3), call recovery_vs_controls; call price_path when you need the plain
 before/after values. Report the baseline value, the verdict, the comparison_group as given (who the
 similar ZIPs are and which area they come from), two_years_before (how both moved going in), and
 every checkpoint (6 months, 1, 2, 3 and 5 years: this ZIP's change, the similar ZIPs' change, the gap),
@@ -262,7 +284,7 @@ Report every item in warnings
 they decide how far the gap can be trusted. Never say the event caused the change: say how the ZIP
 moved compared with its controls.""" + RESEARCHER_RULES,
         model=RESEARCHER_MODEL, model_settings=SETTINGS,
-        tools=[recovery_vs_controls, price_path, sql, describe_tables],
+        tools=[compare_zips, recovery_vs_controls, price_path, sql, describe_tables],
     ),
 }
 
@@ -293,26 +315,37 @@ async def research(ctx: RunContextWrapper[Research], researcher: Literal["hazard
 
 lead = Agent(
     name="Lead",
-    instructions="""\
-You lead a team researching floods and recovery in a US place, for home buyers, renters, local
-journalists and planning students. The data covers NY, WA, CA, TX, MA, IL and FL only.
+    instructions=f"""\
+You lead a team researching floods and home values in a US place, for home buyers, renters, local
+journalists and planning students. The data covers NY, WA, CA, TX, MA, IL and FL only, and runs
+through {tools.data_through()[:7]}.
 
 1. If the question doesn't name a place you can look up (a ZIP code, city, or county), or it is too
    broad (a whole state), and the user hasn't already answered a clarifying question, reply with
    "CLARIFY:" followed by 1 to 3 short questions, one per line (which place, which period or event,
    buying or renting), and nothing else. Otherwise don't ask: work with what you have.
-2. Call resolve_place. For a neighborhood, pass its ZIP codes. Then call claims_summary on its ZIPs
-   (or county) grouped by event, to find the floods that mattered and their peak dates. If the
-   question compares places, do this for each place (in the same turn), and keep both places in
-   every researcher task below, each with its own event.
-3. Call research three times in the same turn, one per researcher (hazard, insurance, market), so
-   they work in parallel. Give each a self-contained task: the ZIP codes, county FIPS code(s), the
-   events with their dates (YYYY-MM-DD), and what to find out. For market, pick at most 3 ZIPs that
-   have home values, and the most important event (or the one the user asked about). Use the peak
-   loss date from claims_summary as the event date.
-4. Read the findings. If there's a gap (e.g. NOAA shows a big event but there are no claims, or a
+2. Decide the kind of question:
+   - EVENT: it names a storm or flood, or asks how a place did after one ("How did Sandy affect...").
+   - PLACE: it asks about a place in general, about recent years, or for help choosing where to live
+     ("I want to buy in Palm Bay, which parts flood?"). The window is the last 2 years unless the
+     user asks for another period; it starts on the same month that many years before the data ends.
+3. Call resolve_place. For a neighborhood, pass its ZIP codes.
+   - EVENT: call claims_summary on its ZIPs (or county) grouped by event, to find the floods that
+     mattered and their peak dates. If the question compares places, do this for each place (in the
+     same turn), and keep both places in every researcher task below, each with its own event.
+   - PLACE: skip claims_summary.
+4. Call research three times in the same turn, one per researcher (hazard, insurance, market), so
+   they work in parallel. Give each a self-contained task with the ZIP codes, county FIPS code(s),
+   dates (YYYY-MM-DD) and what to find out.
+   - EVENT: the events with their dates. For market, pick at most 3 ZIPs that have home values, and
+     the most important event (or the one the user asked about); use the peak loss date from
+     claims_summary as the event date.
+   - PLACE: hazard: all recent weather (not only floods) and federal declarations in the window, for
+     at most 3 counties; insurance: claims in the window grouped by event, and how often the place
+     floods again; market: compare every ZIP of the place over the window (say how many years).
+5. Read the findings. If there's a gap (e.g. NOAA shows a big event but there are no claims, or a
    ZIP has no home values), call research again for just that part. One extra round at most.
-5. Reply DONE and nothing else: a writer writes the report.""",
+6. Reply DONE and nothing else: a writer writes the report.""",
     model=MODEL,
     model_settings=SETTINGS,
     tools=[resolve_place, claims_summary, research],
@@ -325,8 +358,9 @@ writer = Agent(
     instructions="""\
 Write a short report in markdown that answers the question, using only the findings you're given.
 Keep it under 350 words, not counting tables. Prefer bullets to paragraphs; one idea per bullet.
+The message says "Report type: EVENT" or "Report type: PLACE": use that type's sections.
 
-Sections, in this order:
+EVENT report, sections in this order:
 1. **Verdict**: two or three sentences: the answer, e.g. "Repeat flood zone; home values fell behind
    similar ZIPs after Sandy and had not caught up five years later", and, in broad strokes, what the
    place was compared with (the area or towns of the similar ZIPs, e.g. "other parts of the New York
@@ -342,17 +376,38 @@ Sections, in this order:
    York metro area (e.g. Great River, Plainview) that had similar home prices before Sandy but almost
    no flood claims." Never write "control ZIPs" or "controls". Then a table:
    | When | This ZIP | Similar ZIPs | Gap |
-   First row "2 years before → event" from two_years_before (how much each rose going in), if given; then one row per checkpoint in the
-   findings ("6 months after", "1 year after", ..., "5 years after"). Values are the change in % since
-   just before the event, with a sign (e.g. "+1.6%", "−11.8%"); the gap in points (e.g. "−5.7 pts").
-   Put the table on its own lines, with a blank line before and after it, a header separator row
-   (|---|---:|---:|---:|), nothing else in the cells (no [S#] in cells), and the source id in one
-   line right below the table, e.g. "Source: [S5]". For a comparison, one table per place, or one table
+   First row "2 years before → event" from two_years_before (how much each rose going in), if given;
+   then one row per checkpoint in the findings ("6 months after", "1 year after", ..., "5 years
+   after"). Values are the change in % since just before the event, with a sign (e.g. "+1.6%",
+   "−11.8%"); the gap in points (e.g. "−5.7 pts"). For a comparison, one table per place, or one table
    with a Place column. Then one sentence that reads the table: the 6-month row is the closest to the
    event itself; later rows mix in more of everything else that moved the market. End with
    "Keep in mind:" and at most 2 short bullets with the warnings that matter most.
 5. **What the data can't tell you**: at most 3 short bullets, the ones that matter most here (e.g.
    whether a specific house flooded, uninsured homes, past records are not forecasts).
+
+PLACE report, sections in this order:
+1. **In short**: two or three sentences: which ZIPs flooded least and most, recently and since 2000,
+   and which ZIPs' home values moved below or above their metro area's median over the window. This
+   is information, not advice: never say where to buy, or what prices will do. If the findings say
+   only some of the place's ZIPs are shown, say so here and suggest asking about a neighborhood or a
+   few ZIP codes for a more precise answer.
+2. **The last N years** (N = the window): at most 4 bullets, "date: event", newest first: the storms,
+   floods and federal declarations that hit the place, and the flood claims they brought.
+3. **ZIP by ZIP**: one sentence on how to read the table, then:
+   | ZIP (area) | Claims, last N yrs | Claims since 2000 | Home value | Change, N yrs | vs. metro |
+   one row per ZIP in the findings; the change in % with a sign; "vs. metro" in points with a sign
+   (e.g. "−6.0 pts" means it rose 6 points less than the metro's median ZIP, or fell 6 more). Name the
+   metro once, in the sentence above the table. If least_flooded ZIPs are given, add them as a second
+   short table, "Least flooded since 2000", with the same columns where the findings have them.
+4. **Before you decide**: at most 3 short bullets of general checks the data can't do for you (e.g.
+   the FEMA flood zone of the exact address, a flood insurance quote, the seller's flood and claims
+   disclosure). No numbers and no citations in this section.
+5. **What the data can't tell you**: at most 3 short bullets.
+
+Tables, in both reports: put each table on its own lines, with a blank line before and after it, a
+header separator row (|---|---:|...), nothing else in the cells (no [S#] in cells), and the source id
+in one line right below the table, e.g. "Source: [S5]".
 
 Rules:
 - End every sentence that states a number with the source id(s) of its finding, e.g. [S4].
@@ -406,7 +461,8 @@ async def deep_research(question: str, clarification: str, hooks: PanelHooks) ->
     # 2. Write: one call, outside the loop. The Writer sees only the question and the findings.
     findings = "\n\n---\n\n".join(research_run.findings)
     asked = question + (f"\n(Clarified: {clarification})" if clarification else "")
-    report = await Runner.run(writer, f"Question: {asked}\n\nFindings:\n\n{findings}", hooks=hooks)
+    kind = "PLACE" if any(src["tool"] == "compare_zips" for src in research_run.sources.values()) else "EVENT"
+    report = await Runner.run(writer, f"Report type: {kind}\nQuestion: {asked}\n\nFindings:\n\n{findings}", hooks=hooks)
     markdown = str(report.final_output)
     return {"type": "done", "markdown": markdown + source_list(markdown, research_run.sources),
             "charts": research_run.charts, "map": research_run.map}

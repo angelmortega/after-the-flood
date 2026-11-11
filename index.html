@@ -375,18 +375,24 @@
                 <h1>After the Flood</h1>
                 <p>
                     Name a place in New York, Washington, California, Texas, Massachusetts, Illinois or Florida. Three researchers check its storms, its
-                    flood insurance claims and its home values in parallel, and a writer turns what they find into a cited report with a recovery verdict.
+                    flood insurance claims and its home values in parallel, and a writer turns what they find into a cited report: how the place did after a
+                    storm, or how its ZIP codes compare over the last few years if you're choosing where to live.
                 </p>
             </header>
 
             <section class="card">
                 <h2>Ask</h2>
                 <form id="task" class="row">
-                    <input id="question" type="text" placeholder="A place, and optionally an event: e.g. How did Hurricane Ian affect Fort Myers Beach?" autocomplete="off" />
+                    <input id="question" type="text" placeholder="A place, and optionally an event: e.g. Which parts of Palm Bay, FL flooded in the last 2 years?" autocomplete="off" />
                     <button id="run" type="submit">Research</button>
                 </form>
                 <p class="examples-label">Example questions: click one to run it, or type your own above.</p>
                 <div class="examples" id="examples">
+                    <button type="button" data-q="I'm thinking of buying a house in Palm Bay, FL. Which parts of Palm Bay have been hit hardest by storms and flooding in the last two years, and which ZIP codes have flooded the least?">
+                        <span class="tag compare">Where to live</span>
+                        <span class="title">Palm Bay, FL: the last 2 years</span>
+                        <span class="sub">Storms, flood claims and home values, ZIP by ZIP.</span>
+                    </button>
                     <button type="button" data-q="How did Hurricane Sandy affect home values in Long Beach, NY (11561)?">
                         <span class="tag down">Didn't recover</span>
                         <span class="title">Long Beach, NY after Sandy</span>
@@ -466,10 +472,10 @@
                     <p class="note">Circle size: NFIP claims since 1978. Orange: the ZIPs you asked about. Locations are ZIP centers.</p>
                 </section>
                 <section class="card">
-                    <h2>Home values vs. similar ZIPs</h2>
+                    <h2 id="chart-title">Home values vs. similar ZIPs</h2>
                     <div id="chart-pick"></div>
                     <div class="chart-box"><canvas id="chart"></canvas></div>
-                    <p class="note" id="chart-note">The recovery curve appears when the market researcher finishes.</p>
+                    <p class="note" id="chart-note">The home value chart appears when the market researcher finishes.</p>
                 </section>
             </div>
 
@@ -595,7 +601,8 @@
                 document.querySelectorAll(".stage").forEach((s) => s.classList.remove("active", "done"));
                 charts = [];
                 $("chart-pick").replaceChildren();
-                $("chart-note").textContent = "The recovery curve appears when the market researcher finishes.";
+                $("chart-title").textContent = "Home values";
+                $("chart-note").textContent = "The home value chart appears when the market researcher finishes.";
                 if (chart) chart.destroy();
                 chart = null;
                 if (mapLayer) mapLayer.clearLayers();
@@ -636,6 +643,7 @@
                 "called repeat_flooding": "Checking repeat flooding",
                 "called price_path": "Reading home values",
                 "called recovery_vs_controls": "Comparing with similar ZIPs nearby",
+                "called compare_zips": "Comparing the place's ZIP codes",
                 "called sql": "Running a custom query",
                 "called describe_tables": "Reading table columns",
             };
@@ -702,6 +710,7 @@
 
             function addChart(event) {
                 $("visuals").hidden = false;
+                if (event.kind === "prices") return drawPrices(event);
                 charts.push(event);
                 const b = document.createElement("button");
                 b.type = "button";
@@ -737,6 +746,7 @@
 
             function drawChart(i) {
                 const c = charts[i];
+                $("chart-title").textContent = "Home values vs. similar ZIPs";
                 [...$("chart-pick").children].forEach((b, j) => b.classList.toggle("on", i === j));
                 const months = c.months.map((m) => m.month.slice(0, 7));
                 if (chart) chart.destroy();
@@ -765,6 +775,52 @@
                 });
                 $("chart-note").textContent =
                     `Typical home value (Zillow ZHVI) from 3 years before the event, 100 = the 3 months before it. Compared with ${c.comparison_group} [${c.source_id}]`;
+            }
+
+            // A place's ZIP codes against their metro's median ZIP, 100 = the start of the window.
+            const LINE_COLORS = ["#d84315", "#1565c0", "#2e7d32", "#6a1b9a", "#ef6c00"];
+
+            function drawPrices(c) {
+                $("chart-title").textContent = "Home values: ZIP by ZIP vs. the metro area";
+                $("chart-pick").replaceChildren();
+                const months = Object.keys(c.metro_points).sort();
+                if (chart) chart.destroy();
+                chart = new Chart($("chart"), {
+                    type: "line",
+                    data: {
+                        labels: months,
+                        datasets: [
+                            ...c.lines.map((l, i) => ({
+                                label: `${l.zip} (${l.area.split(",")[0]})`,
+                                data: months.map((m) => l.points[m] ?? null),
+                                borderColor: LINE_COLORS[i % LINE_COLORS.length],
+                                backgroundColor: LINE_COLORS[i % LINE_COLORS.length],
+                                borderWidth: 2.2, pointRadius: 0, tension: 0.2, spanGaps: true,
+                            })),
+                            {
+                                label: c.metro ? `${c.metro.split(",")[0]} metro (median ZIP)` : "Metro (median ZIP)",
+                                data: months.map((m) => c.metro_points[m]),
+                                borderColor: css("--controls"), backgroundColor: css("--controls"),
+                                borderWidth: 2, borderDash: [6, 4], pointRadius: 0, tension: 0.2,
+                            },
+                        ],
+                    },
+                    options: {
+                        maintainAspectRatio: false,
+                        interaction: { mode: "index", intersect: false },
+                        scales: {
+                            x: { ticks: { maxTicksLimit: 8 }, grid: { display: false } },
+                            y: { title: { display: true, text: "Home value (window start = 100)" } },
+                        },
+                        plugins: {
+                            legend: { position: "bottom", labels: { boxWidth: 14 } },
+                            eventLine: { date: c.window_start, label: "Window start" },
+                        },
+                    },
+                    plugins: [eventLine],
+                });
+                $("chart-note").textContent =
+                    `Typical home value (Zillow ZHVI), 100 = ${c.window_start}, the start of the window. The dashed line is the median ZIP of the ${c.metro || "metro area"}: a ZIP below it gained less (or lost more) than its market. [${c.source_id}]`;
             }
 
             // --- Report ---
