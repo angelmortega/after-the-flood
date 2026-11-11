@@ -27,8 +27,8 @@ set_tracing_disabled(True)
 MODEL = LitellmModel(model="vertex_ai/gemini-3.5-flash", api_key="unused")
 # Researchers call tools and summarize: the cheaper model is enough.
 RESEARCHER_MODEL = LitellmModel(model="vertex_ai/gemini-3.5-flash-lite", api_key="unused")
-# A stalled model call would hang the page: give up after 90 s, and retry twice.
-SETTINGS = ModelSettings(extra_args={"vertex_location": "global", "timeout": 90, "num_retries": 2})
+# A stalled model call would hang the page: give up after 90 s, and retry up to 4 times (Vertex often returns 429 when busy).
+SETTINGS = ModelSettings(extra_args={"vertex_location": "global", "timeout": 90, "num_retries": 4})
 
 # Three researchers per round, two rounds at most. Prompts ask for restraint; code enforces it.
 MAX_RESEARCHERS = 6
