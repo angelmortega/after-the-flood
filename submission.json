@@ -1,5 +1,5 @@
 {
-  "deploy_url": "https://REPLACE-WITH-PROJECT-2-CLOUD-RUN-URL.run.app",
+  "deploy_url": "https://after-the-flood-859932602393.us-central1.run.app",
   "authors": ["amo2189", "jts2199", "bif2111"],
   "path": "research"
 }
