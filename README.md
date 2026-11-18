@@ -219,62 +219,71 @@ Keep in mind:
   3. 77037: 3,558
   4. 77088: 3,445
   5. 77040: 3,220
-- **Biggest events:** Hurricane Harvey (48,992 claims county-wide, $5.37B), Tropical Storm Allison and Hurricane Ike.
+- **For context:** most of those claims come from Hurricane Harvey (48,992 claims county-wide, $5.37B), Tropical Storm Allison and Hurricane Ike. The report ranks the ZIPs and covers the last 2 years of storms in detail.
 
 <!-- answer:q2:baseline -->
 **No tools (Gemini 3.5 Flash, no system prompt):**
 
 <details><summary>Show the answer</summary>
 
-In Harris County, Texas, determining which ZIP codes have flooded the most since 2000 depends on how "flooding" is measured: by the **number of FEMA flood insurance claims**, the **total number of flooded homes during major events** (like Hurricane Harvey), or the **density of "Severe Repetitive Loss" (SRL) properties** (homes that have flooded multiple times).
+Determining which ZIP codes in Harris County have flooded the most since 2000 depends on how "flooding" is measured—whether by the **number of FEMA National Flood Insurance Program (NFIP) claims**, the **number of "Repetitive Loss" properties**, or the **sheer volume of homes inundated** during catastrophic events like Tropical Storm Allison (2001), the Memorial Day Flood (2015), the Tax Day Flood (2016), Hurricane Harvey (2017), Tropical Storm Imelda (2019), and the storms of 2024.
 
-Since 2000, Harris County has been hit by several major flood events, including Tropical Storm Allison (2001), the Memorial Day Flood (2015), the Tax Day Flood (2016), Hurricane Harvey (2017), Tropical Storm Imelda (2019), and the severe storms of Spring 2024.
-
-Based on historical data from the Federal Emergency Management Agency (FEMA), the Harris County Flood Control District, and local flood registries, the following ZIP codes are consistently identified as the most heavily and frequently flooded.
+According to data from the Federal Emergency Management Agency (FEMA), the Harris County Flood Control District (HCFCD), and post-Harvey housing analyses, the following ZIP codes in Harris County consistently rank as the most severely and frequently flooded.
 
 ---
 
-### 1. **77096 (Meyerland / Brays Bayou)**
-*   **Why it floods:** Meyerland is infamous for some of the highest rates of repetitive flooding in the United States. It sits directly along **Brays Bayou**. 
-*   **Key events:** This ZIP code suffered devastating, consecutive flooding during the 2015 Memorial Day flood, the 2016 Tax Day flood, and Hurricane Harvey in 2017. 
-*   **Significance:** It contains one of the nation's highest concentrations of FEMA **Severe Repetitive Loss (SRL)** properties, where many homes have flooded three, four, or more times. Extensive bayou widening and home-elevation projects have been underway here for years to combat this.
+### 1. **77096 (Meyerland / Southwest Houston)**
+*   **Primary Source of Flooding:** Brays Bayou
+*   **Why it ranks at the top:** Meyerland is historically known as one of the premier "repetitive loss" hotspots in the entire United States. It suffered catastrophic flooding three years in a row (2015 Memorial Day, 2016 Tax Day, and 2017 Hurricane Harvey). 
+*   **Impact:** In Hurricane Harvey alone, over 9,000 homes in this ZIP code flooded. It has some of the highest concentrations of FEMA Severe Repetitive Loss (SRL) properties in the country. 
 
 ### 2. **77084 (Bear Creek / Addicks / West Houston)**
-*   **Why it floods:** Located in West Harris County, this ZIP code is situated immediately adjacent to and inside the government-owned inundation pool of the **Addicks Reservoir**. 
-*   **Key events:** During Hurricane Harvey, thousands of homes in this ZIP code flooded. Some flooded because they were built inside the reservoir's dry basin, which filled to unprecedented levels; others flooded when the Army Corps of Engineers had to conduct controlled releases into Buffalo Bayou.
-*   **Significance:** 77084 consistently ranks near the very top of Harris County ZIP codes for the **highest total volume of flood claims** filed during a single event (Harvey).
+*   **Primary Source of Flooding:** Addicks Reservoir pool (upstream flooding)
+*   **Why it ranks at the top:** Located right on the edge of the Addicks Reservoir, this ZIP code was the epicenter of upstream reservoir flooding during Hurricane Harvey. Because the reservoir filled to capacity, water backed up into thousands of homes that were built inside the reservoir's evacuation pool.
+*   **Impact:** Over 10,000 homes flooded in 77084 during Harvey, making it one of the absolute highest ZIP codes for total volume of flooded structures in a single event.
 
-### 3. **77044 & 77396 (Northeast Houston / Humble / Sheldon)**
-*   **Why they flood:** These ZIP codes border **Greens Bayou** and the **San Jacinto River** (near Lake Houston). 
-*   **Key events:** Heavily impacted during Tropical Storm Allison, Hurricane Harvey, Tropical Storm Imelda, and the May 2024 floods. 
-*   **Significance:** Greens Bayou is one of the fastest-rising bayous in the county, and the San Jacinto River basin is highly susceptible to massive upstream releases from Lake Conroe. These areas feature a mix of dense residential neighborhoods and low-lying, semi-rural properties that experience severe, deep water during riverine floods.
+### 7. **77079 & 77024 (Memorial / Energy Corridor / West Houston)**
+*   **Primary Source of Flooding:** Buffalo Bayou and controlled reservoir releases
+*   **Why they rank at the top:** These wealthy, densely populated neighborhoods sit downstream of the Addicks and Barker reservoirs. During Hurricane Harvey, the U.S. Army Corps of Engineers had to make controlled releases of water into Buffalo Bayou to prevent dam failure. This kept these ZIP codes underwater for nearly two weeks.
+*   **Impact:** High-dollar NFIP payout areas with extensive, long-duration structural damage. 
 
-### 4. **77379 & 77388 (Spring / Cypress Creek)**
-*   **Why they flood:** These ZIP codes sit along the **Cypress Creek** watershed in northern Harris County.
-*   **Key events:** Cypress Creek experienced historic, catastrophic crests during the 2016 Tax Day flood and Hurricane Harvey, inundating thousands of subdivision homes that were built near the creek's massive floodplain.
-*   **Significance:** Cypress Creek lacks the massive concrete channelization of other Houston bayous, meaning when it overflows, it spreads shallow-to-deep water across a massive geographic footprint.
+### 4. **77025 (Braeswood Place / Woodside / South Main)**
+*   **Primary Source of Flooding:** Brays Bayou
+*   **Why it ranks at the top:** Neighboring Meyerland, 77025 is highly susceptible to the same Brays Bayou overflows. It features a massive concentration of repetitive-loss townhomes, apartment complexes, and single-family homes.
+*   **Impact:** Heavily inundated during Allison, Memorial Day, Tax Day, and Harvey.
 
-### 5. **77079 (Memorial / Westmead / Buffalo Bayou)**
-*   **Why it floods:** This ZIP code runs along **Buffalo Bayou** just downstream of the Barker and Addicks Reservoirs.
-*   **Key events:** It experienced severe flooding during Hurricane Harvey due to the record-breaking, weeks-long emergency water releases from the reservoirs, which kept Buffalo Bayou far above its banks long after the rain had stopped. 
+### 5. **77396 & 77346 (Humble / Atascocita)**
+*   **Primary Source of Flooding:** West Fork of the San Jacinto River
+*   **Why they rank at the top:** These ZIP codes in northeast Harris County are highly vulnerable to riverine flooding. When Lake Conroe releases water or when heavy rains gorge the San Jacinto River, these areas flood rapidly.
+*   **Impact:** This area saw severe flooding during Harvey, Imelda (2019), and faced major evacuations and home inundations again during the river flooding in May 2024.
 
-### 6. **77339 & 77345 (Kingwood)**
-*   **Why they flood:** Known as the "Livable Forest," Kingwood is situated at the confluence of the **West Fork of the San Jacinto River** and Lake Houston.
-*   **Key events:** Kingwood suffered catastrophic flooding during Hurricane Harvey and again during the May 2024 floods due to rapid rises of the San Jacinto River.
-*   **Significance:** Because of the geography, Kingwood is highly vulnerable to rapid river rises, which can swamp entire commercial centers and master-planned neighborhoods under several feet of water.
+### 6. **77074 & 77036 (Sharpstown / Southwest Houston)**
+*   **Primary Source of Flooding:** Brays Bayou and Keegans Bayou
+*   **Why they rank at the top:** High-density, lower-income areas with older infrastructure that struggle with both bayou overflows and street ponding (local drainage failure).
+*   **Impact:** Thousands of apartment units and single-family homes in these areas have flooded multiple times since 2000.
+
+### 7. **77008 (The Heights / Greater Heights)**
+*   **Primary Source of Flooding:** White Oak Bayou
+*   **Why it ranks at the top:** While parts of the Heights sit on high ground, the southern and western portions near White Oak Bayou are historically flood-prone.
+*   **Impact:** Significant claims during Tropical Storm Allison (2001) and the Tax Day Flood (2016).
 
 ---
 
-### Summary of FEMA Data Trends in Harris County
-If you look strictly at **FEMA National Flood Insurance Program (NFIP) payouts and claims** since 2000, the top three ZIP codes for both the volume of claims and the dollar amount of damage are:
-1.  **77084** (Bear Creek/Addicks)
-2.  **77096** (Meyerland)
-3.  **77079** (West Houston/Memorial)
+### Summary of Flooding Types by ZIP Code:
 
-### How to Check Specific Properties
-If you are looking at buying a home or researching a specific address in these areas, you can use these local tools:
-*   **Harris County Flood Education Mapping Tool:** (hosted by the Harris County Flood Control District) allows you to enter any address to see its watershed, flood plain designation (100-year vs. 500-year), and whether it has historical flooding mapped nearby.
-*   **Texas Flood Disclosure Laws:** Sellers in Texas are legally required to disclose if a home has ever flooded or if it sits in a designated floodplain.
+| ZIP Code | Major Neighborhood | Primary Waterway / Cause | Notable Events |
+| :--- | :--- | :--- | :--- |
+| **77096** | Meyerland | Brays Bayou | 2015, 2016, 2017 (Harvey) |
+| **77084** | Bear Creek / Katy | Addicks Reservoir backing up | 2016, 2017 (Harvey) |
+| **77079** | Memorial / Energy Corridor | Buffalo Bayou / Reservoir releases | 2017 (Harvey) |
+| **77025** | Braeswood Place | Brays Bayou | 2001, 2015, 2016, 2017 |
+| **77396** | Humble | San Jacinto River | 2017, 2019, 2024 |
+| **77450** | Katy (Cinco Ranch) | Barker Reservoir / Buffalo Bayou | 2017 (Harvey) |
+
+### Current Mitigation Efforts
+If you are looking at these ZIP codes for real estate or insurance purposes, it is worth noting that massive changes have occurred since 2017:
+*   **Project Brays:** A massive, multi-year federal/county project has widened Brays Bayou and added major detention basins, significantly reducing the flood risk for **77096** and **77025**.
+*   **Home Elevations and Buyouts:** Hundreds of the most frequently flooded homes in **77096**, **77025**, and **77396** have been structurally elevated above the 500-year floodplain or bought out by the Harris County Flood Control District and turned into green space.
 
 </details>
 <!-- /answer:q2:baseline -->
@@ -284,68 +293,70 @@ If you are looking at buying a home or researching a specific address in these a
 
 <details><summary>Show the answer</summary>
 
-# In short
-Among the analyzed Harris County ZIP codes, 77096 flooded the most since 2000 with 5,332 claims [S1], while 77339 had the fewest with 2,197 claims [S1]. Recently, 77024 flooded most with 7 claims, while 77571 flooded least with 0 claims [S6, S12]. Over the last 2 years, home values in 77024 rose 23.8 points above the metro median, while 77084 fell 2.4 points below it [S12]. Only a subset of the county's ZIPs are shown, so we suggest asking about specific neighborhoods for a precise answer.
+### In short
 
-# The last 26 years
-* July 2024: Hurricane Beryl hit Harris County, triggering a federal major disaster declaration [S2].
-* September 2019: Tropical Storm Imelda caused 2 deaths and $200,005,000 in nominal property damage from severe rain [S3].
-* August 2017: Hurricane Harvey caused 38 deaths, $10,000,000,000 in property damage [S3], and generated 15,324 claims in the top ZIPs [S8].
-* September 2008: Hurricane Ike caused 9 deaths, $5,000,080,000 in property damage, and a storm tide up to 15 feet [S3].
+* ZIP 77096 flooded the most since 2000 with 5,332 claims, while ZIP 77046 was the least flooded of those analyzed with 13 claims [S6].
+* Over the last two years, ZIP 77096 and ZIP 77089 had home values that grew above the Houston-The Woodlands-Sugar Land metro area median, while ZIPs 77037, 77088, and 77040 fell below it [S6].
+* Because this report only covers select ZIP codes in Harris County, you should ask about specific neighborhoods for a more precise answer.
 
-# ZIP by ZIP
-The following table compares home values and flood claims across Harris County ZIP codes in the Houston metro area [S6, S12].
+### The last 2 years
+
+* June 15, 2026: Tropical storm Arthur-TS peaked, bringing 24 flood claims that paid out $302,874 [S7].
+* February 14, 2026: A Valentine's Day severe storm hit Cloverland with 70 mph winds, causing $93,000 in property damage [S3].
+* August 31, 2025: A flash flood caused over 10 water rescues in Houston and $75,000 in property damage [S3].
+* January 20, 2025: A winter storm brought 2 to 6 inches of snowfall and 2 indirect deaths [S3].
+
+### ZIP by ZIP
+
+We rank Harris County ZIP codes by their total flood claims since 2000 and show how their home values grew compared to the Houston-The Woodlands-Sugar Land metro area median change of -3.5% [S6].
 
 | ZIP (area) | Claims, last 2 yrs | Claims since 2000 | Home value | Change, 2 yrs | vs. metro |
 |---|---:|---:|---:|---:|---:|
 | 77096 (Houston) | 5 | 5,332 | $434,130 | +0.6% | +4.1 pts |
-| 77089 (Houston) | 3 | 4,224 | $270,868 | −3.2% | +0.3 pts |
-| 77571 (La Porte) | 0 | 3,165 | $257,286 | −0.9% | +2.6 pts |
-| 77401 (Bellaire) | 2 | 3,104 | $1,181,406 | +8.7% | +12.2 pts |
-| 77546 (Friendswood) | 2 | 3,104 | $397,818 | −0.6% | +2.9 pts |
-| 77084 (Houston) | 3 | 2,924 | $261,493 | −5.9% | −2.4 pts |
-| 77079 (Houston) | 3 | 2,806 | $741,499 | +11.5% | +15.0 pts |
-| 77025 (Houston) | 2 | 2,690 | $469,519 | −1.1% | +2.4 pts |
-| 77586 (El Lago) | 5 | 2,588 | $345,872 | −3.1% | +0.4 pts |
-| 77024 (Houston) | 7 | 2,414 | $1,472,827 | +20.3% | +23.8 pts |
-| 77429 (Cypress) | 2 | 2,265 | $373,727 | −2.7% | +0.8 pts |
-| 77339 (Houston) | 1 | 2,197 | $292,537 | −2.1% | +1.4 pts |
+| 77089 (Houston) | 3 | 4,224 | $270,868 | -3.2% | +0.3 pts |
+| 77037 (Houston) | 3 | 3,559 | $197,954 | -4.8% | -1.3 pts |
+| 77088 (Houston) | 4 | 3,448 | $210,113 | -6.0% | -2.5 pts |
+| 77040 (Houston) | 0 | 3,222 | $255,196 | -4.7% | -1.2 pts |
 
-Source: [S1, S6, S12]
+Source: [S6]
 
-# Before you decide
-* Check the FEMA flood zone designation of the exact address.
-* Obtain a direct flood insurance quote for the property.
-* Review the seller's official flood and claims disclosure form.
+Least flooded since 2000:
 
-# What the data can't tell you
-* Whether a specific home actually flooded, as claims data is anonymized to the ZIP code level [S8].
-* The extent of flood damage to uninsured properties, since the dataset only records National Flood Insurance Program claims [S8].
-* Future flood risks or price trends, as historical storm records and past home value changes do not forecast future performance [S6, S12].
+| ZIP (area) | Claims, last 2 yrs | Claims since 2000 | Home value | Change, 2 yrs | vs. metro |
+|---|---:|---:|---:|---:|---:|
+| 77046 (Houston) | 0 | 13 | $312,717 | — | -4.0 pts |
+| 77003 (Houston) | 1 | 38 | $345,225 | — | -5.2 pts |
+| 77014 (Houston) | 0 | 74 | $244,543 | — | -0.5 pts |
+
+Source: [S6]
+
+### Before you decide
+
+* Check the FEMA flood zone of the exact address you are considering.
+* Obtain a personalized flood insurance quote for the property.
+* Review the seller's written flood and claims disclosure.
+
+### What the data can't tell you
+
+* Whether a specific property flooded, as the data is anonymized to ZIP codes.
+* The true extent of flooding, because properties without insurance cannot file claims.
+* Future flood risks, as past weather and claims do not guarantee future patterns.
 
 ## Sources
 
-- **[S1]** `resolve_place(place='Harris County', state='TX')`: Census ZCTA -> county overlap; ZIP metadata: city, metro, county (Zillow + Census)
+- **[S3]** `storm_events(county_fips='48201', start='2024-09-01', end='2026-09-30', flood_only=False)`: NOAA Storm Events Database; NOAA storm event -> county (NWS zone-county correlation)
   ```sql
-  SELECT c.zip, z.city, coalesce(z.state, s.state) AS state, z.metro, c.county_fips, c.county_name, c.land_share, z.zip IS NOT NULL AS has_home_values FROM zip_county c LEFT JOIN zips z USING (zip) LEFT JOIN (SELECT DISTINCT state, county_fips[1:2] AS st FROM declarations) s ON s.st = c.county_fips[1:2] WHERE c.county_name ILIKE 'Harris County' || '%' AND ('TX' IS NULL OR coalesce(z.state, s.state) = 'TX') ORDER BY c.zip, c.land_share DESC
-  ```
-- **[S2]** `declarations(county_fips='48201', start='2000-01-01', end='2026-09-30')`: FEMA disaster declarations (OpenFEMA Disaster Declarations Summaries v2)
-  ```sql
-  SELECT declaration_id, declaration_type, title, incident_type, incident_begin, incident_end, declaration_date, designated_area, individual_assistance, public_assistance, hazard_mitigation FROM declarations WHERE (county_fips = '48201' OR county_fips = '48201'[1:2] || '000') AND incident_begin BETWEEN '2000-01-01' AND '2026-09-30' ORDER BY incident_begin DESC
-  ```
-- **[S3]** `storm_events(county_fips='48201', start='2000-01-01', end='2026-09-30', flood_only=True)`: NOAA Storm Events Database; NOAA storm event -> county (NWS zone-county correlation)
-  ```sql
-  SELECT event_type, count(*) AS events, count(DISTINCT year(begin_date)) AS years_with_events, sum(deaths) AS deaths, sum(injuries) AS injuries, sum(damage_property) AS property_damage_usd, min(begin_date) AS first, max(begin_date) AS last FROM ( SELECT e.* FROM storm_events e JOIN storm_event_counties c USING (event_id) WHERE c.county_fips = '48201' AND e.begin_date BETWEEN '2000-01-01' AND '2026-09-30' AND e.event_type IN (SELECT unnest(['Flash Flood', 'Flood', 'Coastal Flood', 'Storm Surge/Tide', 'Lakeshore Flood', 'Heavy Rain', 'Hurricane (Typhoon)', 'Hurricane', 'Tropical Storm', 'Tropical Depression', 'Seiche', 'Tsunami']))) GROUP BY event_type ORDER BY events DESC
+  SELECT event_type, count(*) AS events, count(DISTINCT year(begin_date)) AS years_with_events, sum(deaths) AS deaths, sum(injuries) AS injuries, sum(damage_property) AS property_damage_usd, min(begin_date) AS first, max(begin_date) AS last FROM ( SELECT e.* FROM storm_events e JOIN storm_event_counties c USING (event_id) WHERE c.county_fips = '48201' AND e.begin_date BETWEEN '2024-09-01' AND '2026-09-30' ) GROUP BY event_type ORDER BY events DESC
   ```
   ```sql
-  SELECT episode_id, min(begin_date) AS begin_date, max(end_date) AS end_date, string_agg(DISTINCT event_type, ', ') AS event_types, count(*) AS events, sum(deaths) AS deaths, sum(damage_property) AS property_damage_usd, left(any_value(episode_narrative), 700) AS episode_narrative, left(arg_max(event_narrative, coalesce(damage_property, 0)), 500) AS worst_event_narrative FROM ( SELECT e.* FROM storm_events e JOIN storm_event_counties c USING (event_id) WHERE c.county_fips = '48201' AND e.begin_date BETWEEN '2000-01-01' AND '2026-09-30' AND e.event_type IN (SELECT unnest(['Flash Flood', 'Flood', 'Coastal Flood', 'Storm Surge/Tide', 'Lakeshore Flood', 'Heavy Rain', 'Hurricane (Typhoon)', 'Hurricane', 'Tropical Storm', 'Tropical Depression', 'Seiche', 'Tsunami']))) GROUP BY episode_id ORDER BY coalesce(sum(damage_property), 0) DESC, sum(deaths) DESC, events DESC LIMIT 10
+  SELECT episode_id, min(begin_date) AS begin_date, max(end_date) AS end_date, string_agg(DISTINCT event_type, ', ') AS event_types, count(*) AS events, sum(deaths) AS deaths, sum(damage_property) AS property_damage_usd, left(any_value(episode_narrative), 700) AS episode_narrative, left(arg_max(event_narrative, coalesce(damage_property, 0)), 500) AS worst_event_narrative FROM ( SELECT e.* FROM storm_events e JOIN storm_event_counties c USING (event_id) WHERE c.county_fips = '48201' AND e.begin_date BETWEEN '2024-09-01' AND '2026-09-30' ) GROUP BY episode_id ORDER BY coalesce(sum(damage_property), 0) DESC, sum(deaths) DESC, events DESC LIMIT 10
   ```
-- **[S6]** `compare_zips(zips=['77089', '77096', '77546', '77571', '77586'], years=2)`: NFIP flood insurance claims (OpenFEMA NFIP Redacted Claims v3); Zillow Home Value Index (ZHVI), typical home value by ZIP and month; ZIP metadata: city, metro, county (Zillow + Census)
+- **[S6]** `compare_zips(years=2, county_fips='48201', rank_by='since_2000')`: NFIP flood insurance claims (OpenFEMA NFIP Redacted Claims v3); Zillow Home Value Index (ZHVI), typical home value by ZIP and month; ZIP metadata: city, metro, county (Zillow + Census)
   ```sql
-  SELECT z.zip, any_value(m.city) AS city, any_value(m.county_name) AS county, any_value(m.metro) AS metro, count(c.id) FILTER (WHERE c.date_of_loss >= '2024-09-01') AS claims_recent, coalesce(sum(c.paid_total) FILTER (WHERE c.date_of_loss >= '2024-09-01'), 0) AS paid_recent_usd, string_agg(DISTINCT coalesce(c.flood_event, 'unnamed flooding'), '; ') FILTER (WHERE c.date_of_loss >= '2024-09-01') AS recent_events, count(c.id) FILTER (WHERE c.year_of_loss >= 2000) AS claims_since_2000, count(DISTINCT c.year_of_loss) FILTER (WHERE c.year_of_loss >= 2000) AS years_with_claims_since_2000 FROM (SELECT unnest(['77089', '77096', '77546', '77571', '77586']) AS zip) z LEFT JOIN nfip_claims c USING (zip) LEFT JOIN zips m USING (zip) GROUP BY z.zip
+  SELECT z.zip, any_value(m.city) AS city, any_value(m.county_name) AS county, any_value(m.metro) AS metro, count(c.id) FILTER (WHERE c.date_of_loss >= '2024-09-01') AS claims_recent, coalesce(sum(c.paid_total) FILTER (WHERE c.date_of_loss >= '2024-09-01'), 0) AS paid_recent_usd, string_agg(DISTINCT coalesce(c.flood_event, 'unnamed flooding'), '; ') FILTER (WHERE c.date_of_loss >= '2024-09-01') AS recent_events, count(c.id) FILTER (WHERE c.year_of_loss >= 2000) AS claims_since_2000, count(DISTINCT c.year_of_loss) FILTER (WHERE c.year_of_loss >= 2000) AS years_with_claims_since_2000 FROM (SELECT unnest(['77002', '77003', '77004', '77005', '77006', '77007', '77008', '77009', '77010', '77011', '77012', '77013', '77014', '77015', '77016', '77017', '77018', '77019', '77020', '77021', '77022', '77023', '77024', '77025', '77026', '77027', '77028', '77029', '77030', '77031', '77032', '77033', '77034', '77035', '77036', '77037', '77038', '77039', '77040', '77041', '77042', '77043', '77044', '77045', '77046', '77047', '77048', '77049', '77050', '77051', '77054', '77055', '77056', '77057', '77058', '77059', '77060', '77061', '77062', '77063', '77064', '77065', '77066', '77067', '77068', '77069', '77070', '77071', '77072', '77073', '77074', '77075', '77076', '77077', '77078', '77079', '77080', '77081', '77082', '77083', '77084', '77085', '77086', '77087', '77088', '77089', '77090', '77091', '77092', '77093', '77094', '77095', '77096', '77098', '77099', '77204', '77336', '77338', '77339', '77345', '77346', '77373', '77375', '77377', '77379', '77388', '77389', '77396', '77401', '77429', '77433', '77447', '77449', '77450', '77493', '77502', '77503', '77504', '77505', '77506', '77507', '77520', '77521', '77530', '77532', '77536', '77547', '77562', '77571', '77586', '77587', '77598']) AS zip) z LEFT JOIN nfip_claims c USING (zip) LEFT JOIN zips m USING (zip) GROUP BY z.zip
   ```
   ```sql
-  SELECT zip, strftime(month, '%Y-%m') AS month, value FROM zhvi WHERE zip IN (SELECT unnest(['77089', '77096', '77546', '77571', '77586'])) AND month >= '2023-09-01' ORDER BY month
+  SELECT zip, strftime(month, '%Y-%m') AS month, value FROM zhvi WHERE zip IN (SELECT unnest(['77002', '77003', '77004', '77005', '77006', '77007', '77008', '77009', '77010', '77011', '77012', '77013', '77014', '77015', '77016', '77017', '77018', '77019', '77020', '77021', '77022', '77023', '77024', '77025', '77026', '77027', '77028', '77029', '77030', '77031', '77032', '77033', '77034', '77035', '77036', '77037', '77038', '77039', '77040', '77041', '77042', '77043', '77044', '77045', '77046', '77047', '77048', '77049', '77050', '77051', '77054', '77055', '77056', '77057', '77058', '77059', '77060', '77061', '77062', '77063', '77064', '77065', '77066', '77067', '77068', '77069', '77070', '77071', '77072', '77073', '77074', '77075', '77076', '77077', '77078', '77079', '77080', '77081', '77082', '77083', '77084', '77085', '77086', '77087', '77088', '77089', '77090', '77091', '77092', '77093', '77094', '77095', '77096', '77098', '77099', '77204', '77336', '77338', '77339', '77345', '77346', '77373', '77375', '77377', '77379', '77388', '77389', '77396', '77401', '77429', '77433', '77447', '77449', '77450', '77493', '77502', '77503', '77504', '77505', '77506', '77507', '77520', '77521', '77530', '77532', '77536', '77547', '77562', '77571', '77586', '77587', '77598'])) AND month >= '2023-09-01' ORDER BY month
   ```
   ```sql
   WITH a AS (SELECT zip, value FROM zhvi WHERE strftime(month, '%Y-%m') = '2024-09'), b AS (SELECT zip, value FROM zhvi WHERE strftime(month, '%Y-%m') = '2026-09') SELECT z.metro, round(100 * (median(b.value / a.value) - 1), 1) AS change_pct, count(*) AS zips FROM zips z JOIN a USING (zip) JOIN b USING (zip) WHERE z.metro IN (SELECT unnest(['Houston-The Woodlands-Sugar Land, TX'])) GROUP BY 1
@@ -353,25 +364,12 @@ Source: [S1, S6, S12]
   ```sql
   WITH a AS (SELECT zip, value FROM zhvi WHERE strftime(month, '%Y-%m') = '2024-09') SELECT strftime(v.month, '%Y-%m') AS month, 10000 * median(v.value / a.value) AS idx_x10000 FROM zhvi v JOIN a USING (zip) JOIN zips z USING (zip) WHERE z.metro = 'Houston-The Woodlands-Sugar Land, TX' AND v.month >= '2023-09-01' GROUP BY 1 ORDER BY 1
   ```
-- **[S8]** `claims_summary(zips=['77096', '77079', '77339', '77084', '77025', '77401', '77089', '77429', '77024', '77070'], county_fips='48201', start='2000-01-01', end='2026-09-30', group_by='event')`: NFIP flood insurance claims (OpenFEMA NFIP Redacted Claims v3)
+- **[S7]** `claims_summary(county_fips='48201', start='2024-09-01', end='2026-09-30', group_by='event')`: NFIP flood insurance claims (OpenFEMA NFIP Redacted Claims v3)
   ```sql
-  SELECT count(*) AS claims, sum(paid_total) AS paid_usd, median(paid_total) AS median_paid_usd, count(*) FILTER (WHERE paid_total > 0) AS claims_paid, count(DISTINCT year_of_loss) AS years_with_claims, min(date_of_loss) AS first_loss, max(date_of_loss) AS last_loss, round(100.0 * avg(CASE WHEN primary_residence THEN 1 ELSE 0 END), 1) AS pct_primary_residence, round(100.0 * avg(CASE WHEN left(flood_zone_current, 1) IN ('A', 'V') THEN 1 ELSE 0 END), 1) AS pct_in_high_risk_zone FROM nfip_claims WHERE zip IN (SELECT unnest(['77024', '77025', '77070', '77079', '77084', '77089', '77096', '77339', '77401', '77429'])) AND county_fips = '48201' AND date_of_loss BETWEEN '2000-01-01' AND '2026-09-30'
+  SELECT count(*) AS claims, sum(paid_total) AS paid_usd, median(paid_total) AS median_paid_usd, count(*) FILTER (WHERE paid_total > 0) AS claims_paid, count(DISTINCT year_of_loss) AS years_with_claims, min(date_of_loss) AS first_loss, max(date_of_loss) AS last_loss, round(100.0 * avg(CASE WHEN primary_residence THEN 1 ELSE 0 END), 1) AS pct_primary_residence, round(100.0 * avg(CASE WHEN left(flood_zone_current, 1) IN ('A', 'V') THEN 1 ELSE 0 END), 1) AS pct_in_high_risk_zone FROM nfip_claims WHERE county_fips = '48201' AND date_of_loss BETWEEN '2024-09-01' AND '2026-09-30'
   ```
   ```sql
-  SELECT coalesce(flood_event, 'Unnamed (' || year_of_loss || ')') AS event, count(*) AS claims, sum(paid_total) AS paid_usd, median(paid_total) AS median_paid_usd, mode(date_of_loss) AS peak_loss_date, min(date_of_loss) AS first_loss, max(date_of_loss) AS last_loss FROM nfip_claims WHERE zip IN (SELECT unnest(['77024', '77025', '77070', '77079', '77084', '77089', '77096', '77339', '77401', '77429'])) AND county_fips = '48201' AND date_of_loss BETWEEN '2000-01-01' AND '2026-09-30' GROUP BY 1 ORDER BY claims DESC LIMIT 50
-  ```
-- **[S12]** `compare_zips(zips=['77079', '77339', '77084', '77025', '77401', '77024', '77429'], years=2)`: NFIP flood insurance claims (OpenFEMA NFIP Redacted Claims v3); Zillow Home Value Index (ZHVI), typical home value by ZIP and month; ZIP metadata: city, metro, county (Zillow + Census)
-  ```sql
-  SELECT z.zip, any_value(m.city) AS city, any_value(m.county_name) AS county, any_value(m.metro) AS metro, count(c.id) FILTER (WHERE c.date_of_loss >= '2024-09-01') AS claims_recent, coalesce(sum(c.paid_total) FILTER (WHERE c.date_of_loss >= '2024-09-01'), 0) AS paid_recent_usd, string_agg(DISTINCT coalesce(c.flood_event, 'unnamed flooding'), '; ') FILTER (WHERE c.date_of_loss >= '2024-09-01') AS recent_events, count(c.id) FILTER (WHERE c.year_of_loss >= 2000) AS claims_since_2000, count(DISTINCT c.year_of_loss) FILTER (WHERE c.year_of_loss >= 2000) AS years_with_claims_since_2000 FROM (SELECT unnest(['77024', '77025', '77079', '77084', '77339', '77401', '77429']) AS zip) z LEFT JOIN nfip_claims c USING (zip) LEFT JOIN zips m USING (zip) GROUP BY z.zip
-  ```
-  ```sql
-  SELECT zip, strftime(month, '%Y-%m') AS month, value FROM zhvi WHERE zip IN (SELECT unnest(['77024', '77025', '77079', '77084', '77339', '77401', '77429'])) AND month >= '2023-09-01' ORDER BY month
-  ```
-  ```sql
-  WITH a AS (SELECT zip, value FROM zhvi WHERE strftime(month, '%Y-%m') = '2024-09'), b AS (SELECT zip, value FROM zhvi WHERE strftime(month, '%Y-%m') = '2026-09') SELECT z.metro, round(100 * (median(b.value / a.value) - 1), 1) AS change_pct, count(*) AS zips FROM zips z JOIN a USING (zip) JOIN b USING (zip) WHERE z.metro IN (SELECT unnest(['Houston-The Woodlands-Sugar Land, TX'])) GROUP BY 1
-  ```
-  ```sql
-  WITH a AS (SELECT zip, value FROM zhvi WHERE strftime(month, '%Y-%m') = '2024-09') SELECT strftime(v.month, '%Y-%m') AS month, 10000 * median(v.value / a.value) AS idx_x10000 FROM zhvi v JOIN a USING (zip) JOIN zips z USING (zip) WHERE z.metro = 'Houston-The Woodlands-Sugar Land, TX' AND v.month >= '2023-09-01' GROUP BY 1 ORDER BY 1
+  SELECT coalesce(flood_event, 'Unnamed (' || year_of_loss || ')') AS event, count(*) AS claims, sum(paid_total) AS paid_usd, median(paid_total) AS median_paid_usd, mode(date_of_loss) AS peak_loss_date, min(date_of_loss) AS first_loss, max(date_of_loss) AS last_loss FROM nfip_claims WHERE county_fips = '48201' AND date_of_loss BETWEEN '2024-09-01' AND '2026-09-30' GROUP BY 1 ORDER BY claims DESC LIMIT 50
   ```
 
 </details>

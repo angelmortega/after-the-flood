@@ -196,16 +196,20 @@ def recovery_vs_controls(ctx: RunContextWrapper[Research], zip_code: str, event_
 
 
 @function_tool
-def compare_zips(ctx: RunContextWrapper[Research], zips: list[str], years: int = 2) -> str:
+def compare_zips(ctx: RunContextWrapper[Research], zips: list[str] | None = None, years: int = 2,
+                 county_fips: str | None = None, rank_by: Literal["recent", "since_2000"] = "recent") -> str:
     """Compare a place's ZIP codes over the last few years: flood claims recently and since 2000,
-    today's home value, and how it moved compared with the metro area's median ZIP. Pass every ZIP
-    of the place: a big place shows its 5 most-flooded ZIPs and the 3 least-flooded.
+    today's home value, and how it moved compared with the metro area's median ZIP. A big place shows
+    its 5 most-flooded ZIPs and the 3 least-flooded, ranked from the data over every ZIP.
 
     Args:
-        zips: 5-digit ZIP codes of the place.
+        zips: 5-digit ZIP codes of the place: all of them, never a hand-picked few.
         years: How many years back the recent window goes. 2 unless the user asked for another period.
+        county_fips: 5-digit county FIPS: compares every ZIP in the county. Use it for a county.
+        rank_by: 'since_2000' when the question asks which ZIPs flood most overall or since a year;
+            'recent' (default) for recent years.
     """
-    args = {"zips": zips, "years": years}
+    args = {"zips": zips, "years": years, "county_fips": county_fips, "rank_by": rank_by}
     return _answer(ctx, "compare_zips", args, tools.compare_zips, **args)
 
 
@@ -268,8 +272,10 @@ policies, not little flooding.""" + RESEARCHER_RULES,
         instructions="""\
 You research home values from the Zillow Home Value Index. There are two kinds of task.
 
-A task that compares the ZIPs of a place over recent years: call compare_zips once, with every ZIP
-in the task and the number of years. Report one bullet per ZIP: its area, claims in the window and
+A task that compares the ZIPs of a place: call compare_zips once, with every ZIP in the task (or
+county_fips for a whole county), the number of years, and rank_by from the task. Never pick ZIPs
+yourself: the tool ranks every ZIP from the data. Report ranked_by, then one bullet per ZIP in the
+order given: its area, claims in the window and
 since 2000, today's value, its change over the window, and the metro median's change (vs_metro_points).
 Then a bullet with least_flooded and the note, if given. Don't call recovery_vs_controls.
 
@@ -341,8 +347,12 @@ through {tools.data_through()[:7]}.
      the most important event (or the one the user asked about); use the peak loss date from
      claims_summary as the event date.
    - PLACE: hazard: all recent weather (not only floods) and federal declarations in the window, for
-     at most 3 counties; insurance: claims in the window grouped by event, and how often the place
-     floods again; market: compare every ZIP of the place over the window (say how many years).
+     at most 3 counties; insurance: claims in the window grouped by event, claims since 2000 grouped
+     by ZIP (claims_summary with group_by='zip'), and how often the place floods again; market:
+     compare every ZIP of the place over the window (say how many years, and rank_by 'since_2000'
+     if the question asks which ZIPs flood most overall or since a year). For a county, give the
+     county FIPS code instead of listing ZIPs. Never pick ZIP codes from memory: only resolve_place
+     and the tools decide which ZIPs matter.
 5. Read the findings. If there's a gap (e.g. NOAA shows a big event but there are no claims, or a
    ZIP has no home values), call research again for just that part. One extra round at most.
 6. Reply DONE and nothing else: a writer writes the report.""",

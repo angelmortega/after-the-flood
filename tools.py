@@ -516,15 +516,26 @@ def _years_before(month: str, years: int) -> str:
     return f"{int(month[:4]) - years:04d}{month[4:7]}"
 
 
-def compare_zips(zips: list[str] | str, years: int = 2) -> dict:
+def compare_zips(zips: list[str] | str | None = None, years: int = 2, county_fips: str | None = None,
+                 rank_by: str = "recent") -> dict:
     """Compare the ZIPs of a place over the last `years` years: flood claims recently and since
     2000, today's typical home value, and how it moved compared with the metro area's median ZIP.
 
-    A place with more than SHOW_ALL_UP_TO ZIPs shows the SHOW_TOP with the most recent claims
-    (then most claims since 2000), plus the ones with the fewest claims since 2000."""
-    zips = _zips(zips)
+    Pass the place's ZIPs, or county_fips to compare every ZIP whose land is mostly in that county.
+    A place with more than SHOW_ALL_UP_TO ZIPs shows the SHOW_TOP ranked by rank_by ("recent": most
+    claims in the window, then since 2000; "since_2000": most claims since 2000), plus the ones with
+    the fewest claims since 2000."""
+    zips = _zips(zips or [])
+    if county_fips:
+        county_zips, _ = _query("""
+            SELECT zip FROM zip_county
+            QUALIFY row_number() OVER (PARTITION BY zip ORDER BY land_share DESC) = 1 AND county_fips = $c
+        """, {"c": str(county_fips).zfill(5)})
+        zips = sorted(set(zips) | {r["zip"] for r in county_zips})
     if not zips:
-        return {"error": "Pass at least one 5-digit ZIP code."}
+        return {"error": "Pass at least one 5-digit ZIP code, or a 5-digit county_fips."}
+    if rank_by not in ("recent", "since_2000"):
+        rank_by = "recent"
     years = max(1, min(int(years), 10))
     end = data_through()
     start = _years_before(end, years)
@@ -587,15 +598,19 @@ def compare_zips(zips: list[str] | str, years: int = 2) -> dict:
             "metro_change_window_pct": m,
             "vs_metro_points": round(chg - m, 1) if chg is not None and m is not None else None,
         })
-    rows.sort(key=lambda r: (-r["claims_recent"], -r["claims_since_2000"], r["zip"]))
+    if rank_by == "since_2000":
+        rows.sort(key=lambda r: (-r["claims_since_2000"], -r["claims_recent"], r["zip"]))
+    else:
+        rows.sort(key=lambda r: (-r["claims_recent"], -r["claims_since_2000"], r["zip"]))
     shown, note, least = rows, None, None
     if len(rows) > SHOW_ALL_UP_TO:
         shown = rows[:SHOW_TOP]
         least = sorted((r for r in rows if r["home_value_now"]), key=lambda r: (r["claims_since_2000"], r["zip"]))[:3]
         least = [{k: r[k] for k in ("zip", "area", "claims_recent", "claims_since_2000", "home_value_now", "vs_metro_points")}
                  for r in least]
-        note = (f"This place has {len(rows)} ZIP codes: showing the {SHOW_TOP} with the most flood claims in the "
-                f"last {years} years. Ask about a neighborhood or a few ZIP codes for a closer look.")
+        ranked = "since 2000" if rank_by == "since_2000" else f"in the last {years} years"
+        note = (f"This place has {len(rows)} ZIP codes: showing the {SHOW_TOP} with the most flood claims "
+                f"{ranked}. Ask about a neighborhood or a few ZIP codes for a closer look.")
 
     # The chart: each shown ZIP and the metro median, 100 = the start of the window.
     main_metro = max(metros, key=lambda m: sum(r["metro"] == m for r in claims)) if metros else None
@@ -612,6 +627,7 @@ def compare_zips(zips: list[str] | str, years: int = 2) -> dict:
         "data_through": end,
         "window": f"{start} to {end_m} ({years} years)",
         "zips_in_place": len(rows),
+        "ranked_by": "claims since 2000" if rank_by == "since_2000" else f"claims in the last {years} years",
         "zips": shown,
         "least_flooded": least,
         "note": note,
